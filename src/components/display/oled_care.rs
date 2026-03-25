@@ -105,11 +105,21 @@ impl Component for OledCareModel {
                     shutdown
                         .register(async move {
                             match kwriteconfig_ausfuehren(&[
-                                "--file", "powermanagementprofilesrc",
-                                "--group", "AC", "--group", "DPMSControl",
-                                "--key", "idleTime", idle_time,
-                            ]).await {
-                                Ok(()) => out.emit(OledCareCommandOutput::PixelRefreshGesetzt(aktiv)),
+                                "--file",
+                                "powermanagementprofilesrc",
+                                "--group",
+                                "AC",
+                                "--group",
+                                "DPMSControl",
+                                "--key",
+                                "idleTime",
+                                idle_time,
+                            ])
+                            .await
+                            {
+                                Ok(()) => {
+                                    out.emit(OledCareCommandOutput::PixelRefreshGesetzt(aktiv))
+                                }
                                 Err(e) => out.emit(OledCareCommandOutput::Fehler(e)),
                             }
                         })
@@ -214,4 +224,3 @@ async fn plasmashell_evaluate(
         Err(e) => out.emit(OledCareCommandOutput::Fehler(e)),
     }
 }
-

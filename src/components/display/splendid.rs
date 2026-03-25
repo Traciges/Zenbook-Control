@@ -3,7 +3,9 @@ use relm4::adw;
 use relm4::adw::prelude::*;
 use relm4::prelude::*;
 
-use super::helpers::{kwriteconfig_ausfuehren, qdbus_ausfuehren};
+use super::helpers::{
+    icc_profil_anwenden, icc_profil_zuruecksetzen, kwriteconfig_ausfuehren, qdbus_ausfuehren,
+};
 use crate::services::config::AppConfig;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
@@ -40,6 +42,7 @@ pub enum SplendidMsg {
 pub enum SplendidCommandOutput {
     EyeCareGesetzt(bool),
     FarbtemperaturGesetzt(u32),
+    ProfilAngewendet(SplendidProfil),
     Fehler(String),
 }
 
@@ -224,12 +227,36 @@ impl Component for SplendidModel {
                         });
                     }
                     SplendidProfil::Normal => {
-                        eprintln!("Splendid: Normal-Profil aktiviert (Standard-Farbwiedergabe)");
+                        sender.command(|out, shutdown| {
+                            shutdown
+                                .register(async move {
+                                    match icc_profil_zuruecksetzen().await {
+                                        Ok(()) => {
+                                            out.emit(SplendidCommandOutput::ProfilAngewendet(
+                                                SplendidProfil::Normal,
+                                            ))
+                                        }
+                                        Err(e) => out.emit(SplendidCommandOutput::Fehler(e)),
+                                    }
+                                })
+                                .drop_on_shutdown()
+                        });
                     }
                     SplendidProfil::Lebendig => {
-                        eprintln!(
-                            "Splendid: Lebendig-Profil aktiviert – ICC-Profil muss in KDE-Einstellungen hinterlegt werden"
-                        );
+                        sender.command(|out, shutdown| {
+                            shutdown
+                                .register(async move {
+                                    match icc_profil_anwenden("lebendig.icc").await {
+                                        Ok(()) => {
+                                            out.emit(SplendidCommandOutput::ProfilAngewendet(
+                                                SplendidProfil::Lebendig,
+                                            ))
+                                        }
+                                        Err(e) => out.emit(SplendidCommandOutput::Fehler(e)),
+                                    }
+                                })
+                                .drop_on_shutdown()
+                        });
                     }
                     SplendidProfil::Manuell => {
                         eprintln!(
@@ -237,9 +264,20 @@ impl Component for SplendidModel {
                         );
                     }
                     SplendidProfil::EReading => {
-                        eprintln!(
-                            "Splendid: E-Reading (Graustufen) aktiviert – ICC-Profil muss in KDE-Einstellungen hinterlegt werden"
-                        );
+                        sender.command(|out, shutdown| {
+                            shutdown
+                                .register(async move {
+                                    match icc_profil_anwenden("ereading.icc").await {
+                                        Ok(()) => {
+                                            out.emit(SplendidCommandOutput::ProfilAngewendet(
+                                                SplendidProfil::EReading,
+                                            ))
+                                        }
+                                        Err(e) => out.emit(SplendidCommandOutput::Fehler(e)),
+                                    }
+                                })
+                                .drop_on_shutdown()
+                        });
                     }
                 }
             }
@@ -284,6 +322,9 @@ impl Component for SplendidModel {
             SplendidCommandOutput::FarbtemperaturGesetzt(kelvin) => {
                 eprintln!("Farbtemperatur auf {}K gesetzt", kelvin);
             }
+            SplendidCommandOutput::ProfilAngewendet(profil) => {
+                eprintln!("Splendid: Profil {:?} angewendet", profil);
+            }
             SplendidCommandOutput::Fehler(e) => {
                 eprintln!("Fehler: {e}");
             }
@@ -295,8 +336,16 @@ impl Component for SplendidModel {
 async fn farbtemperatur_setzen(kelvin: u32, out: &relm4::Sender<SplendidCommandOutput>) {
     let kelvin_str = kelvin.to_string();
     if let Err(e) = kwriteconfig_ausfuehren(&[
-        "--file", "kwinrc", "--group", "NightColor", "--key", "NightTemperature", &kelvin_str,
-    ]).await {
+        "--file",
+        "kwinrc",
+        "--group",
+        "NightColor",
+        "--key",
+        "NightTemperature",
+        &kelvin_str,
+    ])
+    .await
+    {
         out.emit(SplendidCommandOutput::Fehler(e));
         return;
     }
@@ -308,8 +357,16 @@ async fn farbtemperatur_setzen(kelvin: u32, out: &relm4::Sender<SplendidCommandO
 async fn night_color_setzen(aktiv: bool, out: &relm4::Sender<SplendidCommandOutput>) {
     let wert = if aktiv { "true" } else { "false" };
     if let Err(e) = kwriteconfig_ausfuehren(&[
-        "--file", "kwinrc", "--group", "NightColor", "--key", "Active", wert,
-    ]).await {
+        "--file",
+        "kwinrc",
+        "--group",
+        "NightColor",
+        "--key",
+        "Active",
+        wert,
+    ])
+    .await
+    {
         out.emit(SplendidCommandOutput::Fehler(e));
         return;
     }

@@ -33,6 +33,10 @@ impl AppConfig {
         ProjectDirs::from("", "", "myasus-linux").map(|dirs| dirs.config_dir().join("config.json"))
     }
 
+    pub fn icc_verzeichnis() -> Option<std::path::PathBuf> {
+        ProjectDirs::from("", "", "myasus-linux").map(|dirs| dirs.config_dir().join("icc"))
+    }
+
     pub fn load() -> Self {
         let Some(path) = Self::config_path() else {
             return Self::default();
