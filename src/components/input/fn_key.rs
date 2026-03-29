@@ -116,8 +116,10 @@ impl Component for FnKeyModel {
                 }
                 self.gesperrt = gesperrt;
 
-                let wert = if gesperrt { "0" } else { "1" };
-                let args_str = format!("asus_wmi.fnlock_default={wert}");
+                let args_flag = format!(
+                    "--args=asus_wmi.fnlock_default={}",
+                    if gesperrt { "0" } else { "1" }
+                );
 
                 sender.command(move |out, shutdown| {
                     shutdown
@@ -128,16 +130,13 @@ impl Component for FnKeyModel {
                                     "grubby",
                                     "--update-kernel=ALL",
                                     "--remove-args=asus_wmi.fnlock_default",
-                                    &format!("--args={args_str}"),
+                                    &args_flag,
                                 ],
                             )
                             .await;
 
                             match result {
-                                Ok(()) => {
-                                    println!("Boot-Parameter erfolgreich aktualisiert.");
-                                    out.emit(FnKeyCommandOutput::Gesetzt(gesperrt));
-                                }
+                                Ok(()) => out.emit(FnKeyCommandOutput::Gesetzt(gesperrt)),
                                 Err(e) => out.emit(FnKeyCommandOutput::Fehler(e)),
                             }
                         })
