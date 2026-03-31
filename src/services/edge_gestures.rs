@@ -1,7 +1,9 @@
 use evdev::{AbsoluteAxisCode, Device, EventSummary, KeyCode};
 use tokio::sync::watch;
 
+/// Fraction of touchpad width/height that counts as an edge zone (4%)
 const EDGE_PERCENT: f64 = 0.04;
+/// Minimum movement in touchpad units required to trigger an action
 const STEP_THRESHOLD: i32 = 60;
 
 enum GestureState {
@@ -94,8 +96,6 @@ pub async fn run_gesture_loop(mut shutdown: watch::Receiver<bool>) {
     };
 
     let mut state = GestureState::Idle;
-    let mut cur_x: i32 = 0;
-    let mut cur_y: i32 = 0;
 
     loop {
         let event = tokio::select! {
@@ -120,13 +120,12 @@ pub async fn run_gesture_loop(mut shutdown: watch::Receiver<bool>) {
                 }
             }
             EventSummary::AbsoluteAxis(_, AbsoluteAxisCode::ABS_X, value) => {
-                cur_x = value;
                 if let GestureState::Classifying { x, .. } = &mut state {
                     *x = Some(value);
                     try_classify(&mut state, left_bound, right_bound, top_bound);
                 } else if let GestureState::TopEdge { start_x, done } = &mut state {
                     if !*done {
-                        let dx = cur_x - *start_x;
+                        let dx = value - *start_x;
                         if dx.abs() >= STEP_THRESHOLD {
                             *done = true;
                             if dx < 0 {
@@ -139,16 +138,15 @@ pub async fn run_gesture_loop(mut shutdown: watch::Receiver<bool>) {
                 }
             }
             EventSummary::AbsoluteAxis(_, AbsoluteAxisCode::ABS_Y, value) => {
-                cur_y = value;
                 if let GestureState::Classifying { y, .. } = &mut state {
                     *y = Some(value);
                     try_classify(&mut state, left_bound, right_bound, top_bound);
                 } else {
                     match &mut state {
                         GestureState::LeftEdge { last_y } => {
-                            let dy = cur_y - *last_y;
+                            let dy = value - *last_y;
                             if dy.abs() >= STEP_THRESHOLD {
-                                *last_y = cur_y;
+                                *last_y = value;
                                 if dy < 0 {
                                     run_action(
                                         "pactl",
@@ -165,9 +163,9 @@ pub async fn run_gesture_loop(mut shutdown: watch::Receiver<bool>) {
                             }
                         }
                         GestureState::RightEdge { last_y } => {
-                            let dy = cur_y - *last_y;
+                            let dy = value - *last_y;
                             if dy.abs() >= STEP_THRESHOLD {
-                                *last_y = cur_y;
+                                *last_y = value;
                                 if dy < 0 {
                                     run_action("brightnessctl", &["set", "5%+"]).await;
                                 } else {
