@@ -36,6 +36,7 @@ pub struct AutoBeleuchtungModel {
     aufhellung_schwelle: f64,
     abdunklung_schwelle: f64,
     loop_tx: Option<watch::Sender<bool>>,
+    aktuelle_lux: Option<f64>,
 }
 
 #[derive(Debug)]
@@ -49,6 +50,7 @@ pub enum AutoBeleuchtungMsg {
 #[derive(Debug)]
 pub enum AutoBeleuchtungOutput {
     Fehler(String),
+    LuxAktualisiert(f64),
 }
 
 #[relm4::component(pub)]
@@ -62,6 +64,24 @@ impl Component for AutoBeleuchtungModel {
         adw::PreferencesGroup {
             set_title: "Automatische Tastaturhintergrundbeleuchtung",
             set_description: Some("Passt die Tastaturhintergrundbeleuchtung automatisch an das Umgebungslicht an. Erfordert iio-sensor-proxy."),
+
+            add = &adw::ActionRow {
+                set_title: "Aktueller Lichtwert",
+                set_subtitle: "Live-Messwert des Umgebungslichtsensors",
+
+                #[watch]
+                set_visible: model.aufhellung_aktiv || model.abdunklung_aktiv,
+
+                add_suffix = &gtk::Label {
+                    #[watch]
+                    set_label: &match model.aktuelle_lux {
+                        Some(lux) => format!("{lux:.1} lx"),
+                        None => "— lx".to_string(),
+                    },
+                    add_css_class: "numeric",
+                    set_valign: gtk::Align::Center,
+                },
+            },
 
             add = &adw::SwitchRow {
                 set_title: "Automatische Aufhellung",
@@ -156,6 +176,7 @@ impl Component for AutoBeleuchtungModel {
             aufhellung_schwelle,
             abdunklung_schwelle,
             loop_tx,
+            aktuelle_lux: None,
         };
 
         let widgets = view_output!();
@@ -206,6 +227,9 @@ impl Component for AutoBeleuchtungModel {
             AutoBeleuchtungOutput::Fehler(e) => {
                 let _ = sender.output(e);
             }
+            AutoBeleuchtungOutput::LuxAktualisiert(lux) => {
+                self.aktuelle_lux = Some(lux);
+            }
         }
     }
 }
@@ -230,6 +254,7 @@ impl AutoBeleuchtungModel {
             if let Some(tx) = self.loop_tx.take() {
                 let _ = tx.send(false);
             }
+            self.aktuelle_lux = None;
         }
     }
 }
@@ -260,7 +285,6 @@ async fn lichtsensor_logik(
     abdunklung_schwelle: f64,
     mut aktuelle_helligkeit: i32,
 ) -> i32 {
-    eprintln!("Lichtsensor: {level:.1} lx");
     if aufhellung && level < aufhellung_schwelle && aktuelle_helligkeit != 3 {
         if kbd_helligkeit_setzen(3).await {
             aktuelle_helligkeit = 3;
@@ -328,6 +352,7 @@ fn start_sensor_loop(
                     aktuelle_helligkeit,
                 )
                 .await;
+                out.emit(AutoBeleuchtungOutput::LuxAktualisiert(level));
             }
             Err(e) => eprintln!("Startwert LightLevel fehlgeschlagen: {e}"),
         }
@@ -358,6 +383,7 @@ fn start_sensor_loop(
                                     aktuelle_helligkeit,
                                 )
                                 .await;
+                                out.emit(AutoBeleuchtungOutput::LuxAktualisiert(level));
                             }
                             Err(e) => eprintln!("LightLevel lesen fehlgeschlagen: {e}"),
                         }
