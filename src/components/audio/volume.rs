@@ -31,6 +31,7 @@ impl SimpleComponent for VolumeModel {
                 add_suffix = &gtk::Scale {
                     set_orientation: gtk::Orientation::Horizontal,
                     set_range: (0.0, 150.0),
+                    #[watch]
                     set_value: model.volume,
                     set_width_request: 200,
                     connect_value_changed[sender] => move |scale| {
