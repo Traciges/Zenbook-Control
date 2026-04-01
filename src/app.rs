@@ -186,24 +186,26 @@ impl SimpleComponent for AppModel {
         let lang_row = adw::ActionRow::new();
         lang_row.set_title(&t!("language_title"));
 
-        let lang_dropdown = gtk4::DropDown::from_strings(&["English", "Deutsch"]);
+        const SUPPORTED_LANGS: &[(&str, &str)] = &[("English", "en"), ("Deutsch", "de")];
+
+        let display_names: Vec<&str> = SUPPORTED_LANGS.iter().map(|(name, _)| *name).collect();
+        let lang_dropdown = gtk4::DropDown::from_strings(&display_names);
         lang_dropdown.set_valign(gtk4::Align::Center);
 
         let current_lang = crate::services::config::AppConfig::load().language;
-        if current_lang == "de" {
-            lang_dropdown.set_selected(1);
-        } else {
-            lang_dropdown.set_selected(0);
+        if let Some(idx) = SUPPORTED_LANGS
+            .iter()
+            .position(|(_, code)| *code == current_lang)
+        {
+            lang_dropdown.set_selected(idx as u32);
         }
 
         let sender_clone = sender.clone();
         lang_dropdown.connect_selected_notify(move |dd| {
-            let lang = if dd.selected() == 1 {
-                "de".to_string()
-            } else {
-                "en".to_string()
-            };
-            sender_clone.input(AppMsg::SpracheSetzen(lang));
+            let idx = dd.selected() as usize;
+            if let Some(&(_, code)) = SUPPORTED_LANGS.get(idx) {
+                sender_clone.input(AppMsg::SpracheSetzen(code.to_string()));
+            }
         });
 
         lang_row.add_suffix(&lang_dropdown);
