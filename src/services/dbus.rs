@@ -51,6 +51,14 @@ async fn platform_proxy() -> Result<&'static PlatformProxy<'static>, String> {
         .await
 }
 
+pub async fn check_asusd_available() -> bool {
+    let conn = match zbus::Connection::system().await {
+        Ok(c) => c,
+        Err(_) => return false,
+    };
+    PlatformProxy::new(&conn).await.is_ok()
+}
+
 pub async fn get_charge_limit() -> Result<u8, String> {
     let proxy = platform_proxy().await?;
     proxy

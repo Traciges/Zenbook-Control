@@ -9,6 +9,7 @@ use crate::services::config::AppConfig;
 use crate::services::dbus;
 
 pub struct BatteryModel {
+    asusd_verfuegbar: bool,
     wartungsmodus_aktiv: bool,
     volle_aufladung_aktiv: bool,
     tiefschlaf_aktiv: bool,
@@ -24,6 +25,7 @@ pub enum BatteryMsg {
 
 #[derive(Debug)]
 pub enum BatteryCommandOutput {
+    AsusdGeprueft(bool),
     LadelimitGesetzt(u8),
     Fehler(String),
     TimerAbgelaufen,
@@ -42,6 +44,20 @@ impl Component for BatteryModel {
     view! {
         adw::PreferencesGroup {
             set_title: &glib::markup_escape_text(&t!("battery_group_title")),
+            set_description: Some(&t!("battery_group_desc")),
+
+            add = &gtk::Label {
+                #[watch]
+                set_visible: !model.asusd_verfuegbar,
+                set_label: &t!("asusd_missing_warning"),
+                add_css_class: "error",
+                set_wrap: true,
+                set_xalign: 0.0,
+                set_margin_top: 8,
+                set_margin_start: 12,
+                set_margin_end: 12,
+                set_margin_bottom: 4,
+            },
 
             add = &adw::SwitchRow {
                 set_title: &t!("battery_maintenance_title"),
@@ -49,6 +65,9 @@ impl Component for BatteryModel {
 
                 #[watch]
                 set_active: model.wartungsmodus_aktiv,
+
+                #[watch]
+                set_sensitive: model.asusd_verfuegbar,
 
                 connect_active_notify[sender] => move |switch| {
                     sender.input(BatteryMsg::WartungsmodusUmschalten(switch.is_active()));
@@ -63,7 +82,7 @@ impl Component for BatteryModel {
                 set_active: model.volle_aufladung_aktiv,
 
                 #[watch]
-                set_sensitive: model.wartungsmodus_aktiv,
+                set_sensitive: model.asusd_verfuegbar && model.wartungsmodus_aktiv,
 
                 connect_active_notify[sender] => move |switch| {
                     sender.input(BatteryMsg::VolleAufladungUmschalten(switch.is_active()));
@@ -90,12 +109,22 @@ impl Component for BatteryModel {
         sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
         let model = BatteryModel {
+            asusd_verfuegbar: false,
             wartungsmodus_aktiv: false,
             volle_aufladung_aktiv: false,
             tiefschlaf_aktiv: false,
             timer_abbrechen: None,
         };
         let widgets = view_output!();
+
+        sender.command(|out, shutdown| {
+            shutdown
+                .register(async move {
+                    let verfuegbar = dbus::check_asusd_available().await;
+                    out.emit(BatteryCommandOutput::AsusdGeprueft(verfuegbar));
+                })
+                .drop_on_shutdown()
+        });
 
         sender.command(|out, shutdown| {
             shutdown
@@ -226,6 +255,9 @@ impl Component for BatteryModel {
         _root: &Self::Root,
     ) {
         match msg {
+            BatteryCommandOutput::AsusdGeprueft(verfuegbar) => {
+                self.asusd_verfuegbar = verfuegbar;
+            }
             BatteryCommandOutput::InitWert(val) => {
                 self.wartungsmodus_aktiv = val <= 80;
                 self.volle_aufladung_aktiv = false;

@@ -9,6 +9,7 @@ use crate::services::dbus;
 use crate::services::dbus::FanProfile;
 
 pub struct FanModel {
+    asusd_verfuegbar: bool,
     aktuelles_profil: FanProfile,
     check_leistung: gtk::CheckButton,
     check_standard: gtk::CheckButton,
@@ -22,6 +23,7 @@ pub enum FanMsg {
 
 #[derive(Debug)]
 pub enum FanCommandOutput {
+    AsusdGeprueft(bool),
     ProfilGesetzt(FanProfile),
     Fehler(String),
 }
@@ -36,12 +38,28 @@ impl Component for FanModel {
     view! {
         adw::PreferencesGroup {
             set_title: &t!("fan_group_title"),
+            set_description: Some(&t!("fan_group_desc")),
+
+            add = &gtk::Label {
+                #[watch]
+                set_visible: !model.asusd_verfuegbar,
+                set_label: &t!("asusd_missing_warning"),
+                add_css_class: "error",
+                set_wrap: true,
+                set_xalign: 0.0,
+                set_margin_top: 8,
+                set_margin_start: 12,
+                set_margin_end: 12,
+                set_margin_bottom: 4,
+            },
 
             add = &adw::ActionRow {
                 set_title: &t!("fan_performance_title"),
                 set_subtitle: &t!("fan_performance_subtitle"),
                 add_prefix = &model.check_leistung.clone(),
                 set_activatable_widget: Some(&model.check_leistung),
+                #[watch]
+                set_sensitive: model.asusd_verfuegbar,
             },
 
             add = &adw::ActionRow {
@@ -49,6 +67,8 @@ impl Component for FanModel {
                 set_subtitle: &t!("fan_balanced_subtitle"),
                 add_prefix = &model.check_standard.clone(),
                 set_activatable_widget: Some(&model.check_standard),
+                #[watch]
+                set_sensitive: model.asusd_verfuegbar,
             },
 
             add = &adw::ActionRow {
@@ -56,6 +76,8 @@ impl Component for FanModel {
                 set_subtitle: &t!("fan_quiet_subtitle"),
                 add_prefix = &model.check_fluester.clone(),
                 set_activatable_widget: Some(&model.check_fluester),
+                #[watch]
+                set_sensitive: model.asusd_verfuegbar,
             },
         }
     }
@@ -94,6 +116,7 @@ impl Component for FanModel {
         }
 
         let model = FanModel {
+            asusd_verfuegbar: false,
             aktuelles_profil: gespeichertes_profil,
             check_leistung,
             check_standard,
@@ -101,6 +124,15 @@ impl Component for FanModel {
         };
 
         let widgets = view_output!();
+
+        sender.command(|out, shutdown| {
+            shutdown
+                .register(async move {
+                    let verfuegbar = dbus::check_asusd_available().await;
+                    out.emit(FanCommandOutput::AsusdGeprueft(verfuegbar));
+                })
+                .drop_on_shutdown()
+        });
 
         sender.command(move |out, shutdown| {
             shutdown
@@ -152,6 +184,9 @@ impl Component for FanModel {
         _root: &Self::Root,
     ) {
         match msg {
+            FanCommandOutput::AsusdGeprueft(verfuegbar) => {
+                self.asusd_verfuegbar = verfuegbar;
+            }
             FanCommandOutput::ProfilGesetzt(profile) => {
                 eprintln!(
                     "{}",

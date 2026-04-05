@@ -137,6 +137,7 @@ error_touchpad_kde: "KDE touchpad toggle failed. %{error}"
 
 # battery
 battery_group_title: "Energy & Performance"
+battery_group_desc: "Keeps your battery healthy even when it's connected to an AC adapter for an extended period of time. Requires asusctl."
 battery_maintenance_title: "Battery Maintenance Mode"
 battery_maintenance_subtitle: "Enable Battery Maintenance Mode to limit charging to 80% of full capacity, extending battery life."
 battery_full_charge_title: "Full Charge Now Mode"
@@ -168,6 +169,7 @@ audio_profile_set: "Audio profile set to %{profile}"
 
 # fan
 fan_group_title: "Fan Mode"
+fan_group_desc: "Select a preferred fan speed. Requires asusctl."
 fan_performance_title: "Performance Mode"
 fan_performance_subtitle: "Dynamically maximizes cooling performance for compute-intensive tasks."
 fan_balanced_title: "Balanced Mode"
@@ -175,3 +177,4 @@ fan_balanced_subtitle: "Dynamically selects the optimal fan speed for everyday u
 fan_quiet_title: "Whisper Mode"
 fan_quiet_subtitle: "Dynamically minimizes fan speed for a quiet environment."
 fan_profile_set: "Fan profile set to %{profile}"
+asusd_missing_warning: "asusctl (asusd) is not installed or not running. Fan and battery controls are unavailable."

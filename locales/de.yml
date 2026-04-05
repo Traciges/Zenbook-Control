@@ -137,6 +137,7 @@ error_touchpad_kde: "KDE Touchpad-Toggle fehlgeschlagen. %{error}"
 
 # battery
 battery_group_title: "Energie & Leistung"
+battery_group_desc: "Schützt den Akku auch bei dauerhafter Verbindung mit dem Netzteil. Erfordert asusctl."
 battery_maintenance_title: "Akku-Wartungsmodus"
 battery_maintenance_subtitle: "Aktivieren Sie den Akku-Wartungsmodus, um die Akkuladung auf 80% der vollen Kapazität zu begrenzen und so die Lebensdauer des Akkus zu verbessern."
 battery_full_charge_title: "Volle Aufladung sofort-Modus"
@@ -168,6 +169,7 @@ audio_profile_set: "Audio-Profil auf %{profile} gesetzt"
 
 # fan
 fan_group_title: "Lüftermodus"
+fan_group_desc: "Bevorzugte Lüftergeschwindigkeit auswählen. Erfordert asusctl."
 fan_performance_title: "Leistungsmodus"
 fan_performance_subtitle: "Maximiert dynamisch die Kühlleistung für rechenintensive Aufgaben."
 fan_balanced_title: "Standardmodus"
@@ -175,3 +177,4 @@ fan_balanced_subtitle: "Wählt dynamisch die optimale Lüftergeschwindigkeit fü
 fan_quiet_title: "Flüstermodus"
 fan_quiet_subtitle: "Minimiert dynamisch die Lüftergeschwindigkeit für eine leise Umgebung."
 fan_profile_set: "Lüfterprofil auf %{profile} gesetzt"
+asusd_missing_warning: "asusctl (asusd) ist nicht installiert oder läuft nicht. Lüfter- und Akkusteuerung nicht verfügbar."
