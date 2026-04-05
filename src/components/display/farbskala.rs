@@ -6,10 +6,10 @@ use relm4::adw::prelude::*;
 use relm4::prelude::*;
 use rust_i18n::t;
 
-use super::helpers::{icm_profil_anwenden, icm_profil_reset, setup_icm_profiles};
+use super::helpers::{apply_icm_profile, reset_icm_profile, setup_icm_profiles};
 use crate::services::config::AppConfig;
 
-fn dateiname_fuer_index(index: u32) -> Option<&'static str> {
+fn filename_for_index(index: u32) -> Option<&'static str> {
     match index {
         1 => Some("ASUS_sRGB.icm"),
         2 => Some("ASUS_DCIP3.icm"),
@@ -18,16 +18,14 @@ fn dateiname_fuer_index(index: u32) -> Option<&'static str> {
     }
 }
 
-// ── Farbskala (ComboRow) ─────────────────────────────────────────────────────
-
 pub struct FarbskalaModel {
-    farbskala_index: u32,
-    icm_basis_pfad: Option<PathBuf>,
+    color_gamut_index: u32,
+    icm_base_path: Option<PathBuf>,
 }
 
 impl FarbskalaModel {
-    fn farbskala_beschreibung(&self) -> std::borrow::Cow<'static, str> {
-        match self.farbskala_index {
+    fn color_gamut_description(&self) -> std::borrow::Cow<'static, str> {
+        match self.color_gamut_index {
             1 => t!("farbskala_desc_srgb"),
             2 => t!("farbskala_desc_dcip3"),
             3 => t!("farbskala_desc_displayp3"),
@@ -38,13 +36,13 @@ impl FarbskalaModel {
 
 #[derive(Debug)]
 pub enum FarbskalaMsg {
-    FarbskalaWechseln(u32),
+    ChangeColorGamut(u32),
 }
 
 #[derive(Debug)]
 pub enum FarbskalaCommandOutput {
-    IcmBereit(PathBuf),
-    ProfilAngewendet(u32),
+    IcmReady(PathBuf),
+    ProfileApplied(u32),
     Fehler(String),
 }
 
@@ -63,12 +61,12 @@ impl Component for FarbskalaModel {
             add = &adw::ComboRow {
                 set_title: &t!("farbskala_title"),
                 #[watch]
-                set_subtitle: &model.farbskala_beschreibung(),
+                set_subtitle: &model.color_gamut_description(),
                 set_model: Some(&farbskala_list),
                 #[watch]
-                set_selected: model.farbskala_index,
+                set_selected: model.color_gamut_index,
                 connect_selected_notify[sender] => move |row| {
-                    sender.input(FarbskalaMsg::FarbskalaWechseln(row.selected()));
+                    sender.input(FarbskalaMsg::ChangeColorGamut(row.selected()));
                 },
             },
         }
@@ -85,8 +83,8 @@ impl Component for FarbskalaModel {
         let farbskala_list = gtk::StringList::new(&[&native, "sRGB", "DCI-P3", "Display P3"]);
 
         let model = FarbskalaModel {
-            farbskala_index: config.farbskala_index,
-            icm_basis_pfad: None,
+            color_gamut_index: config.farbskala_index,
+            icm_base_path: None,
         };
 
         let widgets = view_output!();
@@ -95,7 +93,7 @@ impl Component for FarbskalaModel {
             shutdown
                 .register(async move {
                     match setup_icm_profiles().await {
-                        Ok(pfad) => out.emit(FarbskalaCommandOutput::IcmBereit(pfad)),
+                        Ok(path) => out.emit(FarbskalaCommandOutput::IcmReady(path)),
                         Err(e) => out.emit(FarbskalaCommandOutput::Fehler(e)),
                     }
                 })
@@ -107,17 +105,17 @@ impl Component for FarbskalaModel {
 
     fn update(&mut self, msg: FarbskalaMsg, sender: ComponentSender<Self>, _root: &Self::Root) {
         match msg {
-            FarbskalaMsg::FarbskalaWechseln(index) => {
-                if index == self.farbskala_index {
+            FarbskalaMsg::ChangeColorGamut(index) => {
+                if index == self.color_gamut_index {
                     return;
                 }
-                self.farbskala_index = index;
+                self.color_gamut_index = index;
                 AppConfig::update(|c| c.farbskala_index = index);
 
-                if let Some(basis) = self.icm_basis_pfad.clone() {
-                    profil_anwenden(index, basis, &sender);
+                if let Some(base) = self.icm_base_path.clone() {
+                    apply_profile(index, base, &sender);
                 } else {
-                    eprintln!("{}", t!("farbskala_icm_path_not_ready"));
+                    tracing::warn!("{}", t!("farbskala_icm_path_not_ready"));
                 }
             }
         }
@@ -130,18 +128,18 @@ impl Component for FarbskalaModel {
         _root: &Self::Root,
     ) {
         match msg {
-            FarbskalaCommandOutput::IcmBereit(pfad) => {
-                eprintln!(
+            FarbskalaCommandOutput::IcmReady(path) => {
+                tracing::info!(
                     "{}",
-                    t!("farbskala_icm_ready", path = pfad.display().to_string())
+                    t!("farbskala_icm_ready", path = path.display().to_string())
                 );
-                if self.farbskala_index > 0 {
-                    profil_anwenden(self.farbskala_index, pfad.clone(), &sender);
+                if self.color_gamut_index > 0 {
+                    apply_profile(self.color_gamut_index, path.clone(), &sender);
                 }
-                self.icm_basis_pfad = Some(pfad);
+                self.icm_base_path = Some(path);
             }
-            FarbskalaCommandOutput::ProfilAngewendet(index) => {
-                eprintln!(
+            FarbskalaCommandOutput::ProfileApplied(index) => {
+                tracing::info!(
                     "{}",
                     t!("farbskala_profile_applied", index = index.to_string())
                 );
@@ -153,16 +151,16 @@ impl Component for FarbskalaModel {
     }
 }
 
-fn profil_anwenden(index: u32, basis: PathBuf, sender: &ComponentSender<FarbskalaModel>) {
+fn apply_profile(index: u32, base: PathBuf, sender: &ComponentSender<FarbskalaModel>) {
     sender.command(move |out, shutdown| {
         shutdown
             .register(async move {
-                let ergebnis = match dateiname_fuer_index(index) {
-                    None => icm_profil_reset().await,
-                    Some(dateiname) => icm_profil_anwenden(dateiname, &basis).await,
+                let result = match filename_for_index(index) {
+                    None => reset_icm_profile().await,
+                    Some(filename) => apply_icm_profile(filename, &base).await,
                 };
-                match ergebnis {
-                    Ok(()) => out.emit(FarbskalaCommandOutput::ProfilAngewendet(index)),
+                match result {
+                    Ok(()) => out.emit(FarbskalaCommandOutput::ProfileApplied(index)),
                     Err(e) => out.emit(FarbskalaCommandOutput::Fehler(e)),
                 }
             })

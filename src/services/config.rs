@@ -47,8 +47,6 @@ pub struct AppConfig {
     pub language: String,
     #[serde(default)]
     pub audio_profil: u32,
-    #[serde(default)]
-    pub custom_preset_name: Option<String>,
     #[serde(default = "default_dc_dimming")]
     pub oled_dc_dimming: u32,
     #[serde(default)]
@@ -76,7 +74,6 @@ impl Default for AppConfig {
             touchpad_aktiv: default_touchpad_aktiv(),
             language: default_language(),
             audio_profil: 0,
-            custom_preset_name: None,
             oled_dc_dimming: default_dc_dimming(),
             zielmodus_aktiv: false,
         }

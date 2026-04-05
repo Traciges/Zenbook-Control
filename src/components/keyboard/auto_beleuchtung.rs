@@ -27,33 +27,29 @@ trait SensorProxy {
     fn has_ambient_light(&self) -> zbus::Result<bool>;
 }
 
-// ──────────────────────────────────────────────────────────────────────────────
-// Automatische Tastaturhintergrundbeleuchtung
-// ──────────────────────────────────────────────────────────────────────────────
-
 pub struct AutoBeleuchtungModel {
-    sensor_verfuegbar: bool,
-    aufhellung_aktiv: bool,
-    abdunklung_aktiv: bool,
-    aufhellung_schwelle: f64,
-    abdunklung_schwelle: f64,
+    sensor_available: bool,
+    auto_brighten: bool,
+    auto_dim: bool,
+    brighten_threshold: f64,
+    dim_threshold: f64,
     loop_tx: Option<watch::Sender<bool>>,
-    aktuelle_lux: Option<f64>,
+    current_lux: Option<f64>,
 }
 
 #[derive(Debug)]
 pub enum AutoBeleuchtungMsg {
-    AufhellungUmschalten(bool),
-    AbdunklungUmschalten(bool),
-    AufhellungSchwelleGeaendert(f64),
-    AbdunklungSchwelleGeaendert(f64),
+    ToggleAutoBrighten(bool),
+    ToggleAutoDim(bool),
+    BrightenThresholdChanged(f64),
+    DimThresholdChanged(f64),
 }
 
 #[derive(Debug)]
 pub enum AutoBeleuchtungCommandOutput {
-    SensorGeprueft(bool),
+    SensorChecked(bool),
     Fehler(String),
-    LuxAktualisiert(f64),
+    LuxUpdated(f64),
 }
 
 #[relm4::component(pub)]
@@ -70,7 +66,7 @@ impl Component for AutoBeleuchtungModel {
 
             add = &gtk::Label {
                 #[watch]
-                set_visible: !model.sensor_verfuegbar,
+                set_visible: !model.sensor_available,
                 set_label: &t!("backlight_sensor_missing_warning"),
                 add_css_class: "error",
                 set_wrap: true,
@@ -86,11 +82,11 @@ impl Component for AutoBeleuchtungModel {
                 set_subtitle: &t!("backlight_light_level_subtitle"),
 
                 #[watch]
-                set_visible: model.sensor_verfuegbar && (model.aufhellung_aktiv || model.abdunklung_aktiv),
+                set_visible: model.sensor_available && (model.auto_brighten || model.auto_dim),
 
                 add_suffix = &gtk::Label {
                     #[watch]
-                    set_label: &match model.aktuelle_lux {
+                    set_label: &match model.current_lux {
                         Some(lux) => format!("{lux:.1} lx"),
                         None => t!("backlight_no_lux").to_string(),
                     },
@@ -104,12 +100,12 @@ impl Component for AutoBeleuchtungModel {
                 set_subtitle: &t!("backlight_auto_on_subtitle"),
 
                 #[watch]
-                set_sensitive: model.sensor_verfuegbar,
+                set_sensitive: model.sensor_available,
                 #[watch]
-                set_active: model.aufhellung_aktiv,
+                set_active: model.auto_brighten,
 
                 connect_active_notify[sender] => move |switch| {
-                    sender.input(AutoBeleuchtungMsg::AufhellungUmschalten(switch.is_active()));
+                    sender.input(AutoBeleuchtungMsg::ToggleAutoBrighten(switch.is_active()));
                 },
             },
 
@@ -118,16 +114,16 @@ impl Component for AutoBeleuchtungModel {
                 set_subtitle: &t!("backlight_threshold_on_subtitle"),
 
                 #[watch]
-                set_sensitive: model.sensor_verfuegbar && model.aufhellung_aktiv,
+                set_sensitive: model.sensor_available && model.auto_brighten,
 
                 add_suffix = &gtk::SpinButton::with_range(0.0, 1000.0, 1.0) {
                     set_valign: gtk::Align::Center,
 
                     #[watch]
-                    set_value: model.aufhellung_schwelle,
+                    set_value: model.brighten_threshold,
 
                     connect_value_changed[sender] => move |spin| {
-                        sender.input(AutoBeleuchtungMsg::AufhellungSchwelleGeaendert(spin.value()));
+                        sender.input(AutoBeleuchtungMsg::BrightenThresholdChanged(spin.value()));
                     },
                 },
             },
@@ -137,12 +133,12 @@ impl Component for AutoBeleuchtungModel {
                 set_subtitle: &t!("backlight_auto_off_subtitle"),
 
                 #[watch]
-                set_sensitive: model.sensor_verfuegbar,
+                set_sensitive: model.sensor_available,
                 #[watch]
-                set_active: model.abdunklung_aktiv,
+                set_active: model.auto_dim,
 
                 connect_active_notify[sender] => move |switch| {
-                    sender.input(AutoBeleuchtungMsg::AbdunklungUmschalten(switch.is_active()));
+                    sender.input(AutoBeleuchtungMsg::ToggleAutoDim(switch.is_active()));
                 },
             },
 
@@ -151,16 +147,16 @@ impl Component for AutoBeleuchtungModel {
                 set_subtitle: &t!("backlight_threshold_off_subtitle"),
 
                 #[watch]
-                set_sensitive: model.sensor_verfuegbar && model.abdunklung_aktiv,
+                set_sensitive: model.sensor_available && model.auto_dim,
 
                 add_suffix = &gtk::SpinButton::with_range(0.0, 1000.0, 1.0) {
                     set_valign: gtk::Align::Center,
 
                     #[watch]
-                    set_value: model.abdunklung_schwelle,
+                    set_value: model.dim_threshold,
 
                     connect_value_changed[sender] => move |spin| {
-                        sender.input(AutoBeleuchtungMsg::AbdunklungSchwelleGeaendert(spin.value()));
+                        sender.input(AutoBeleuchtungMsg::DimThresholdChanged(spin.value()));
                     },
                 },
             },
@@ -173,19 +169,15 @@ impl Component for AutoBeleuchtungModel {
         sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
         let config = AppConfig::load();
-        let aufhellung = config.kbd_aufhellung_aktiv;
-        let abdunklung = config.kbd_abdunklung_aktiv;
-        let aufhellung_schwelle = config.kbd_aufhellung_schwelle;
-        let abdunklung_schwelle = config.kbd_abdunklung_schwelle;
 
         let model = AutoBeleuchtungModel {
-            sensor_verfuegbar: false,
-            aufhellung_aktiv: aufhellung,
-            abdunklung_aktiv: abdunklung,
-            aufhellung_schwelle,
-            abdunklung_schwelle,
+            sensor_available: false,
+            auto_brighten: config.kbd_aufhellung_aktiv,
+            auto_dim: config.kbd_abdunklung_aktiv,
+            brighten_threshold: config.kbd_aufhellung_schwelle,
+            dim_threshold: config.kbd_abdunklung_schwelle,
             loop_tx: None,
-            aktuelle_lux: None,
+            current_lux: None,
         };
 
         let widgets = view_output!();
@@ -193,8 +185,8 @@ impl Component for AutoBeleuchtungModel {
         sender.command(move |out, shutdown| {
             shutdown
                 .register(async move {
-                    let verfuegbar = sensor_proxy_verfuegbar().await;
-                    out.emit(AutoBeleuchtungCommandOutput::SensorGeprueft(verfuegbar));
+                    let available = is_sensor_available().await;
+                    out.emit(AutoBeleuchtungCommandOutput::SensorChecked(available));
                 })
                 .drop_on_shutdown()
         });
@@ -209,28 +201,28 @@ impl Component for AutoBeleuchtungModel {
         _root: &Self::Root,
     ) {
         match msg {
-            AutoBeleuchtungMsg::AufhellungUmschalten(aktiv) => {
-                self.aufhellung_aktiv = aktiv;
-                AppConfig::update(|c| c.kbd_aufhellung_aktiv = aktiv);
-                self.sensor_loop_aktualisieren(sender);
+            AutoBeleuchtungMsg::ToggleAutoBrighten(active) => {
+                self.auto_brighten = active;
+                AppConfig::update(|c| c.kbd_aufhellung_aktiv = active);
+                self.update_sensor_loop(sender);
             }
-            AutoBeleuchtungMsg::AbdunklungUmschalten(aktiv) => {
-                self.abdunklung_aktiv = aktiv;
-                AppConfig::update(|c| c.kbd_abdunklung_aktiv = aktiv);
-                self.sensor_loop_aktualisieren(sender);
+            AutoBeleuchtungMsg::ToggleAutoDim(active) => {
+                self.auto_dim = active;
+                AppConfig::update(|c| c.kbd_abdunklung_aktiv = active);
+                self.update_sensor_loop(sender);
             }
-            AutoBeleuchtungMsg::AufhellungSchwelleGeaendert(wert) => {
-                if (wert - self.aufhellung_schwelle).abs() > f64::EPSILON {
-                    self.aufhellung_schwelle = wert;
-                    AppConfig::update(|c| c.kbd_aufhellung_schwelle = wert);
-                    self.sensor_loop_aktualisieren(sender);
+            AutoBeleuchtungMsg::BrightenThresholdChanged(value) => {
+                if (value - self.brighten_threshold).abs() > f64::EPSILON {
+                    self.brighten_threshold = value;
+                    AppConfig::update(|c| c.kbd_aufhellung_schwelle = value);
+                    self.update_sensor_loop(sender);
                 }
             }
-            AutoBeleuchtungMsg::AbdunklungSchwelleGeaendert(wert) => {
-                if (wert - self.abdunklung_schwelle).abs() > f64::EPSILON {
-                    self.abdunklung_schwelle = wert;
-                    AppConfig::update(|c| c.kbd_abdunklung_schwelle = wert);
-                    self.sensor_loop_aktualisieren(sender);
+            AutoBeleuchtungMsg::DimThresholdChanged(value) => {
+                if (value - self.dim_threshold).abs() > f64::EPSILON {
+                    self.dim_threshold = value;
+                    AppConfig::update(|c| c.kbd_abdunklung_schwelle = value);
+                    self.update_sensor_loop(sender);
                 }
             }
         }
@@ -243,14 +235,14 @@ impl Component for AutoBeleuchtungModel {
         _root: &Self::Root,
     ) {
         match msg {
-            AutoBeleuchtungCommandOutput::SensorGeprueft(verfuegbar) => {
-                self.sensor_verfuegbar = verfuegbar;
-                if verfuegbar && (self.aufhellung_aktiv || self.abdunklung_aktiv) {
+            AutoBeleuchtungCommandOutput::SensorChecked(available) => {
+                self.sensor_available = available;
+                if available && (self.auto_brighten || self.auto_dim) {
                     self.loop_tx = Some(start_sensor_loop(
-                        self.aufhellung_aktiv,
-                        self.aufhellung_schwelle,
-                        self.abdunklung_aktiv,
-                        self.abdunklung_schwelle,
+                        self.auto_brighten,
+                        self.brighten_threshold,
+                        self.auto_dim,
+                        self.dim_threshold,
                         &sender,
                     ));
                 }
@@ -258,39 +250,38 @@ impl Component for AutoBeleuchtungModel {
             AutoBeleuchtungCommandOutput::Fehler(e) => {
                 let _ = sender.output(e);
             }
-            AutoBeleuchtungCommandOutput::LuxAktualisiert(lux) => {
-                self.aktuelle_lux = Some(lux);
+            AutoBeleuchtungCommandOutput::LuxUpdated(lux) => {
+                self.current_lux = Some(lux);
             }
         }
     }
 }
 
 impl AutoBeleuchtungModel {
-    fn sensor_loop_aktualisieren(&mut self, sender: ComponentSender<Self>) {
-        let aktiv = self.aufhellung_aktiv || self.abdunklung_aktiv;
+    fn update_sensor_loop(&mut self, sender: ComponentSender<Self>) {
+        let active = self.auto_brighten || self.auto_dim;
 
-        if aktiv {
-            // Stoppe vorherigen Loop falls vorhanden
+        if active {
             if let Some(tx) = &self.loop_tx {
                 let _ = tx.send(false);
             }
             self.loop_tx = Some(start_sensor_loop(
-                self.aufhellung_aktiv,
-                self.aufhellung_schwelle,
-                self.abdunklung_aktiv,
-                self.abdunklung_schwelle,
+                self.auto_brighten,
+                self.brighten_threshold,
+                self.auto_dim,
+                self.dim_threshold,
                 &sender,
             ));
         } else {
             if let Some(tx) = self.loop_tx.take() {
                 let _ = tx.send(false);
             }
-            self.aktuelle_lux = None;
+            self.current_lux = None;
         }
     }
 }
 
-async fn sensor_proxy_verfuegbar() -> bool {
+async fn is_sensor_available() -> bool {
     let conn = match zbus::Connection::system().await {
         Ok(c) => c,
         Err(_) => return false,
@@ -302,7 +293,7 @@ async fn sensor_proxy_verfuegbar() -> bool {
     proxy.has_ambient_light().await.is_ok()
 }
 
-async fn kbd_helligkeit_setzen(wert: i32) -> bool {
+async fn set_kbd_brightness(value: i32) -> bool {
     run_command_blocking(
         "busctl",
         &[
@@ -313,38 +304,38 @@ async fn kbd_helligkeit_setzen(wert: i32) -> bool {
             "org.freedesktop.UPower.KbdBacklight",
             "SetBrightness",
             "i",
-            &wert.to_string(),
+            &value.to_string(),
         ],
     )
     .await
     .is_ok()
 }
 
-async fn lichtsensor_logik(
+async fn light_sensor_logic(
     level: f64,
-    aufhellung: bool,
-    aufhellung_schwelle: f64,
-    abdunklung: bool,
-    abdunklung_schwelle: f64,
-    mut aktuelle_helligkeit: i32,
+    auto_brighten: bool,
+    brighten_threshold: f64,
+    auto_dim: bool,
+    dim_threshold: f64,
+    mut current_brightness: i32,
 ) -> i32 {
-    if aufhellung && level < aufhellung_schwelle && aktuelle_helligkeit != 3 {
-        if kbd_helligkeit_setzen(3).await {
-            aktuelle_helligkeit = 3;
+    if auto_brighten && level < brighten_threshold && current_brightness != 3 {
+        if set_kbd_brightness(3).await {
+            current_brightness = 3;
         }
-    } else if abdunklung && level > abdunklung_schwelle && aktuelle_helligkeit != 0 {
-        if kbd_helligkeit_setzen(0).await {
-            aktuelle_helligkeit = 0;
+    } else if auto_dim && level > dim_threshold && current_brightness != 0 {
+        if set_kbd_brightness(0).await {
+            current_brightness = 0;
         }
     }
-    aktuelle_helligkeit
+    current_brightness
 }
 
 fn start_sensor_loop(
-    aufhellung: bool,
-    aufhellung_schwelle: f64,
-    abdunklung: bool,
-    abdunklung_schwelle: f64,
+    auto_brighten: bool,
+    brighten_threshold: f64,
+    auto_dim: bool,
+    dim_threshold: f64,
     sender: &ComponentSender<AutoBeleuchtungModel>,
 ) -> watch::Sender<bool> {
     let (tx, mut rx) = watch::channel(true);
@@ -379,25 +370,24 @@ fn start_sensor_loop(
         }
 
         let level_stream = proxy.receive_light_level_changed().await;
-        let mut aktuelle_helligkeit: i32 = -1;
-        let mut letztes_level: f64 = -100.0;
+        let mut current_brightness: i32 = -1;
+        let mut last_level: f64 = -100.0;
 
-        // Startwert einmalig auslesen und Logik anwenden
         match proxy.light_level().await {
             Ok(level) => {
-                letztes_level = level;
-                aktuelle_helligkeit = lichtsensor_logik(
+                last_level = level;
+                current_brightness = light_sensor_logic(
                     level,
-                    aufhellung,
-                    aufhellung_schwelle,
-                    abdunklung,
-                    abdunklung_schwelle,
-                    aktuelle_helligkeit,
+                    auto_brighten,
+                    brighten_threshold,
+                    auto_dim,
+                    dim_threshold,
+                    current_brightness,
                 )
                 .await;
-                out.emit(AutoBeleuchtungCommandOutput::LuxAktualisiert(level));
+                out.emit(AutoBeleuchtungCommandOutput::LuxUpdated(level));
             }
-            Err(e) => eprintln!(
+            Err(e) => tracing::warn!(
                 "{}",
                 t!("backlight_sensor_init_error", error = e.to_string())
             ),
@@ -416,28 +406,27 @@ fn start_sensor_loop(
                     if let Some(changed) = maybe {
                         match changed.get().await {
                             Ok(level) => {
-                                if (level - letztes_level).abs() < 3.0 {
+                                if (level - last_level).abs() < 3.0 {
                                     continue;
                                 }
-                                letztes_level = level;
-                                aktuelle_helligkeit = lichtsensor_logik(
+                                last_level = level;
+                                current_brightness = light_sensor_logic(
                                     level,
-                                    aufhellung,
-                                    aufhellung_schwelle,
-                                    abdunklung,
-                                    abdunklung_schwelle,
-                                    aktuelle_helligkeit,
+                                    auto_brighten,
+                                    brighten_threshold,
+                                    auto_dim,
+                                    dim_threshold,
+                                    current_brightness,
                                 )
                                 .await;
-                                out.emit(AutoBeleuchtungCommandOutput::LuxAktualisiert(level));
+                                out.emit(AutoBeleuchtungCommandOutput::LuxUpdated(level));
                             }
-                            Err(e) => eprintln!(
+                            Err(e) => tracing::warn!(
                                 "{}",
                                 t!("backlight_sensor_read_error", error = e.to_string())
                             ),
                         }
                     } else {
-                        // Stream beendet
                         break;
                     }
                 }

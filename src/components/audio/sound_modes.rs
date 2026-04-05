@@ -10,47 +10,47 @@ use std::path::PathBuf;
 use crate::services::commands::run_command_blocking;
 use crate::services::config::AppConfig;
 
-const PRESET_MUSIK: &str = include_str!("../../../assets/presets/Music.json");
-const PRESET_FILM: &str = include_str!("../../../assets/presets/Movie.json");
+const PRESET_MUSIC: &str = include_str!("../../../assets/presets/Music.json");
+const PRESET_MOVIE: &str = include_str!("../../../assets/presets/Movie.json");
 const PRESET_VIDEO: &str = include_str!("../../../assets/presets/Video.json");
-const PRESET_SPRACHE: &str = include_str!("../../../assets/presets/Voice.json");
-const PRESET_ANGEPASST: &str = include_str!("../../../assets/presets/Perfect_EQ.json");
+const PRESET_VOICE: &str = include_str!("../../../assets/presets/Voice.json");
+const PRESET_CUSTOM_EQ: &str = include_str!("../../../assets/presets/Perfect_EQ.json");
 
 const PRESETS: &[(&str, &str)] = &[
-    ("Movie", PRESET_FILM),
-    ("Music", PRESET_MUSIK),
-    ("Perfect_EQ", PRESET_ANGEPASST),
+    ("Movie", PRESET_MOVIE),
+    ("Music", PRESET_MUSIC),
+    ("Perfect_EQ", PRESET_CUSTOM_EQ),
     ("Video", PRESET_VIDEO),
-    ("Voice", PRESET_SPRACHE),
+    ("Voice", PRESET_VOICE),
 ];
 
 // Index 0..6: Movie, Music, None(bypass), Perfect_EQ, Video, Voice, Custom
-// Index 2 = None (kein Preset, nur Bypass an)
+// Index 2 = None (no preset, bypass only)
 const NONE_IDX: u32 = 2;
 const CUSTOM_IDX: u32 = 6;
-const PRESET_NAMEN: &[&str] = &["Movie", "Music", "Perfect_EQ", "Video", "Voice"];
+const PRESET_NAMES: &[&str] = &["Movie", "Music", "Perfect_EQ", "Video", "Voice"];
 const EASYEFFECTS_STARTUP_DELAY_MS: u64 = 1500;
 
 pub struct SoundModesModel {
-    ee_installiert: bool,
-    aktuelles_profil: u32,
-    vorheriges_profil: u32,
+    ee_installed: bool,
+    current_profile: u32,
+    previous_profile: u32,
     dropdown: gtk::DropDown,
 }
 
 #[derive(Debug)]
 pub enum AudioMsg {
-    ProfilWechseln(u32),
-    CustomPresetPfadGewaehlt(PathBuf),
-    CustomAbgebrochen(u32),
+    ChangeProfile(u32),
+    CustomPresetPathSelected(PathBuf),
+    CustomCancelled(u32),
 }
 
 #[derive(Debug)]
 pub enum AudioCommandOutput {
-    EeGeprueft(bool),
-    PresetsInstalliert,
-    ProfilGesetzt(u32),
-    CustomPresetGeladen(String),
+    EeChecked(bool),
+    PresetsInstalled,
+    ProfileSet(u32),
+    CustomPresetLoaded(String),
     Fehler(String),
 }
 
@@ -68,7 +68,7 @@ impl Component for SoundModesModel {
 
             add = &gtk::Label {
                 #[watch]
-                set_visible: !model.ee_installiert,
+                set_visible: !model.ee_installed,
                 set_label: &t!("ee_missing_warning"),
                 add_css_class: "error",
                 set_wrap: true,
@@ -84,7 +84,7 @@ impl Component for SoundModesModel {
                 add_suffix = &model.dropdown.clone(),
                 set_activatable_widget: Some(&model.dropdown),
                 #[watch]
-                set_sensitive: model.ee_installiert,
+                set_sensitive: model.ee_installed,
             },
         }
     }
@@ -96,7 +96,7 @@ impl Component for SoundModesModel {
     ) -> ComponentParts<Self> {
         let config = AppConfig::load();
 
-        let optionen = gtk::StringList::new(&[
+        let options = gtk::StringList::new(&[
             &t!("audio_profile_film"),
             &t!("audio_profile_musik"),
             &t!("audio_profile_none"),
@@ -105,31 +105,30 @@ impl Component for SoundModesModel {
             &t!("audio_profile_sprache"),
             &t!("audio_profile_custom"),
         ]);
-        let dropdown = gtk::DropDown::new(Some(optionen), gtk::Expression::NONE);
+        let dropdown = gtk::DropDown::new(Some(options), gtk::Expression::NONE);
         dropdown.set_valign(gtk::Align::Center);
         dropdown.set_selected(config.audio_profil);
 
         {
             let sender = sender.clone();
             dropdown.connect_selected_notify(move |dd| {
-                sender.input(AudioMsg::ProfilWechseln(dd.selected()));
+                sender.input(AudioMsg::ChangeProfile(dd.selected()));
             });
         }
 
         let model = SoundModesModel {
-            ee_installiert: false,
-            aktuelles_profil: config.audio_profil,
-            vorheriges_profil: config.audio_profil,
+            ee_installed: false,
+            current_profile: config.audio_profil,
+            previous_profile: config.audio_profil,
             dropdown,
         };
 
         let widgets = view_output!();
 
-        // EasyEffects-Check
         sender.command(move |out, shutdown| {
             shutdown
                 .register(async move {
-                    let installiert = tokio::task::spawn_blocking(|| {
+                    let installed = tokio::task::spawn_blocking(|| {
                         std::process::Command::new("which")
                             .arg("easyeffects")
                             .status()
@@ -138,17 +137,16 @@ impl Component for SoundModesModel {
                     })
                     .await
                     .unwrap_or(false);
-                    out.emit(AudioCommandOutput::EeGeprueft(installiert));
+                    out.emit(AudioCommandOutput::EeChecked(installed));
                 })
                 .drop_on_shutdown()
         });
 
-        // Presets installieren
         sender.command(move |out, shutdown| {
             shutdown
                 .register(async move {
-                    match presets_installieren().await {
-                        Ok(()) => out.emit(AudioCommandOutput::PresetsInstalliert),
+                    match install_presets().await {
+                        Ok(()) => out.emit(AudioCommandOutput::PresetsInstalled),
                         Err(e) => out.emit(AudioCommandOutput::Fehler(
                             t!("audio_preset_install_error", error = e).to_string(),
                         )),
@@ -162,14 +160,14 @@ impl Component for SoundModesModel {
 
     fn update(&mut self, msg: AudioMsg, sender: ComponentSender<Self>, _root: &Self::Root) {
         match msg {
-            AudioMsg::ProfilWechseln(idx) => {
-                if idx == self.aktuelles_profil {
+            AudioMsg::ChangeProfile(idx) => {
+                if idx == self.current_profile {
                     return;
                 }
 
                 if idx == CUSTOM_IDX {
-                    let vorheriges = self.aktuelles_profil;
-                    self.aktuelles_profil = CUSTOM_IDX;
+                    let previous = self.current_profile;
+                    self.current_profile = CUSTOM_IDX;
 
                     let sender_clone = sender.clone();
                     let dialog = gtk::FileDialog::builder()
@@ -187,55 +185,52 @@ impl Component for SoundModesModel {
                         match dialog.open_future(None::<&gtk::Window>).await {
                             Ok(file) => {
                                 if let Some(path) = file.path() {
-                                    sender_clone.input(AudioMsg::CustomPresetPfadGewaehlt(path));
+                                    sender_clone
+                                        .input(AudioMsg::CustomPresetPathSelected(path));
                                 } else {
-                                    sender_clone.input(AudioMsg::CustomAbgebrochen(vorheriges));
+                                    sender_clone.input(AudioMsg::CustomCancelled(previous));
                                 }
                             }
                             Err(_) => {
-                                sender_clone.input(AudioMsg::CustomAbgebrochen(vorheriges));
+                                sender_clone.input(AudioMsg::CustomCancelled(previous));
                             }
                         }
                     });
                     return;
                 }
 
-                self.vorheriges_profil = self.aktuelles_profil;
-                self.aktuelles_profil = idx;
+                self.previous_profile = self.current_profile;
+                self.current_profile = idx;
                 AppConfig::update(|c| c.audio_profil = idx);
 
                 sender.command(move |out, shutdown| {
                     shutdown
                         .register(async move {
-                            if let Err(e) = easyeffects_profil_setzen(idx, None).await {
+                            if let Err(e) = set_easyeffects_profile(idx, None).await {
                                 out.emit(AudioCommandOutput::Fehler(e));
                                 return;
                             }
-                            out.emit(AudioCommandOutput::ProfilGesetzt(idx));
+                            out.emit(AudioCommandOutput::ProfileSet(idx));
                         })
                         .drop_on_shutdown()
                 });
             }
 
-            AudioMsg::CustomPresetPfadGewaehlt(path) => {
-                let name = match extract_file_stem(&path) {
-                    Ok(n) => n,
-                    Err(_) => {
-                        sender.input(AudioMsg::CustomAbgebrochen(self.vorheriges_profil));
-                        return;
-                    }
-                };
+            AudioMsg::CustomPresetPathSelected(path) => {
+                if extract_file_stem(&path).is_err() {
+                    sender.input(AudioMsg::CustomCancelled(self.previous_profile));
+                    return;
+                }
 
                 AppConfig::update(|c| {
                     c.audio_profil = CUSTOM_IDX;
-                    c.custom_preset_name = Some(name.clone());
                 });
 
                 sender.command(move |out, shutdown| {
                     shutdown
                         .register(async move {
-                            match custom_preset_laden(path).await {
-                                Ok(n) => out.emit(AudioCommandOutput::CustomPresetGeladen(n)),
+                            match load_custom_preset(path).await {
+                                Ok(n) => out.emit(AudioCommandOutput::CustomPresetLoaded(n)),
                                 Err(e) => out.emit(AudioCommandOutput::Fehler(e)),
                             }
                         })
@@ -243,10 +238,10 @@ impl Component for SoundModesModel {
                 });
             }
 
-            AudioMsg::CustomAbgebrochen(vorheriges) => {
-                self.aktuelles_profil = vorheriges;
-                self.dropdown.set_selected(vorheriges);
-                AppConfig::update(|c| c.audio_profil = vorheriges);
+            AudioMsg::CustomCancelled(previous) => {
+                self.current_profile = previous;
+                self.dropdown.set_selected(previous);
+                AppConfig::update(|c| c.audio_profil = previous);
             }
         }
     }
@@ -258,15 +253,15 @@ impl Component for SoundModesModel {
         _root: &Self::Root,
     ) {
         match msg {
-            AudioCommandOutput::EeGeprueft(installiert) => {
-                self.ee_installiert = installiert;
+            AudioCommandOutput::EeChecked(installed) => {
+                self.ee_installed = installed;
             }
-            AudioCommandOutput::PresetsInstalliert => {}
-            AudioCommandOutput::ProfilGesetzt(idx) => {
-                eprintln!("{}", t!("audio_profile_set", profile = idx));
+            AudioCommandOutput::PresetsInstalled => {}
+            AudioCommandOutput::ProfileSet(idx) => {
+                tracing::info!("{}", t!("audio_profile_set", profile = idx));
             }
-            AudioCommandOutput::CustomPresetGeladen(name) => {
-                eprintln!("{}", t!("audio_profile_set", profile = name));
+            AudioCommandOutput::CustomPresetLoaded(name) => {
+                tracing::info!("{}", t!("audio_profile_set", profile = name));
             }
             AudioCommandOutput::Fehler(e) => {
                 let _ = sender.output(e);
@@ -276,7 +271,7 @@ impl Component for SoundModesModel {
 }
 
 async fn ensure_easyeffects_running() {
-    let daemon_laeuft = tokio::task::spawn_blocking(|| {
+    let daemon_running = tokio::task::spawn_blocking(|| {
         std::process::Command::new("pgrep")
             .args(["-x", "easyeffects"])
             .status()
@@ -286,7 +281,7 @@ async fn ensure_easyeffects_running() {
     .await
     .unwrap_or(false);
 
-    if !daemon_laeuft {
+    if !daemon_running {
         let _ = tokio::process::Command::new("easyeffects")
             .arg("--gapplication-service")
             .spawn();
@@ -308,7 +303,7 @@ fn extract_file_stem(path: &std::path::Path) -> Result<String, String> {
         .ok_or_else(|| "Invalid file name".to_string())
 }
 
-async fn easyeffects_profil_setzen(idx: u32, custom_name: Option<String>) -> Result<(), String> {
+async fn set_easyeffects_profile(idx: u32, custom_name: Option<String>) -> Result<(), String> {
     ensure_easyeffects_running().await;
 
     if idx == NONE_IDX {
@@ -321,13 +316,13 @@ async fn easyeffects_profil_setzen(idx: u32, custom_name: Option<String>) -> Res
     } else {
         run_command_blocking("easyeffects", &["-b", "2"]).await?;
         let preset_idx = if idx < NONE_IDX { idx } else { idx - 1 } as usize;
-        run_command_blocking("easyeffects", &["-l", PRESET_NAMEN[preset_idx]]).await?;
+        run_command_blocking("easyeffects", &["-l", PRESET_NAMES[preset_idx]]).await?;
     }
 
     Ok(())
 }
 
-async fn custom_preset_laden(path: PathBuf) -> Result<String, String> {
+async fn load_custom_preset(path: PathBuf) -> Result<String, String> {
     let name = extract_file_stem(&path)?;
 
     let dest = easyeffects_output_dir()?.join(format!("{name}.json"));
@@ -343,7 +338,7 @@ async fn custom_preset_laden(path: PathBuf) -> Result<String, String> {
     Ok(name)
 }
 
-async fn presets_installieren() -> Result<(), String> {
+async fn install_presets() -> Result<(), String> {
     let dir = easyeffects_output_dir()?;
     tokio::fs::create_dir_all(&dir)
         .await

@@ -8,20 +8,20 @@ use crate::services::commands::run_command_blocking;
 use crate::services::config::AppConfig;
 
 pub struct FnKeyModel {
-    gesperrt: bool,
-    zeile_hinweis: adw::ActionRow,
-    zeile_gesperrt: adw::ActionRow,
-    zeile_normal: adw::ActionRow,
+    locked: bool,
+    row_hint: adw::ActionRow,
+    row_locked: adw::ActionRow,
+    row_normal: adw::ActionRow,
 }
 
 #[derive(Debug)]
 pub enum FnKeyMsg {
-    GesperrtUmschalten(bool),
+    ToggleLocked(bool),
 }
 
 #[derive(Debug)]
 pub enum FnKeyCommandOutput {
-    Gesetzt(bool),
+    Set(bool),
     Fehler(String),
 }
 
@@ -37,9 +37,9 @@ impl Component for FnKeyModel {
             set_title: &t!("fn_key_group_title"),
             set_description: Some(&t!("fn_key_group_desc")),
 
-            add = &model.zeile_hinweis.clone(),
-            add = &model.zeile_gesperrt.clone(),
-            add = &model.zeile_normal.clone(),
+            add = &model.row_hint.clone(),
+            add = &model.row_locked.clone(),
+            add = &model.row_normal.clone(),
         }
     }
 
@@ -48,23 +48,23 @@ impl Component for FnKeyModel {
         _root: Self::Root,
         sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
-        let check_gesperrt = gtk::CheckButton::new();
+        let check_locked = gtk::CheckButton::new();
         let check_normal = gtk::CheckButton::new();
 
-        check_normal.set_group(Some(&check_gesperrt));
+        check_normal.set_group(Some(&check_locked));
 
-        let gesperrt = AppConfig::load().input_fn_key_gesperrt;
-        if gesperrt {
-            check_gesperrt.set_active(true);
+        let locked = AppConfig::load().input_fn_key_gesperrt;
+        if locked {
+            check_locked.set_active(true);
         } else {
             check_normal.set_active(true);
         }
 
         {
             let sender = sender.clone();
-            check_gesperrt.connect_toggled(move |b| {
+            check_locked.connect_toggled(move |b| {
                 if b.is_active() {
-                    sender.input(FnKeyMsg::GesperrtUmschalten(true));
+                    sender.input(FnKeyMsg::ToggleLocked(true));
                 }
             });
         }
@@ -72,33 +72,33 @@ impl Component for FnKeyModel {
             let sender = sender.clone();
             check_normal.connect_toggled(move |b| {
                 if b.is_active() {
-                    sender.input(FnKeyMsg::GesperrtUmschalten(false));
+                    sender.input(FnKeyMsg::ToggleLocked(false));
                 }
             });
         }
 
-        let zeile_hinweis = adw::ActionRow::new();
-        zeile_hinweis.set_title(&t!("fn_key_hint_title"));
-        zeile_hinweis.set_subtitle(&t!("fn_key_hint_subtitle"));
-        zeile_hinweis.set_selectable(false);
+        let row_hint = adw::ActionRow::new();
+        row_hint.set_title(&t!("fn_key_hint_title"));
+        row_hint.set_subtitle(&t!("fn_key_hint_subtitle"));
+        row_hint.set_selectable(false);
 
-        let zeile_gesperrt = adw::ActionRow::new();
-        zeile_gesperrt.set_title(&t!("fn_key_locked_title"));
-        zeile_gesperrt.set_subtitle(&t!("fn_key_locked_subtitle"));
-        zeile_gesperrt.add_prefix(&check_gesperrt);
-        zeile_gesperrt.set_activatable_widget(Some(&check_gesperrt));
+        let row_locked = adw::ActionRow::new();
+        row_locked.set_title(&t!("fn_key_locked_title"));
+        row_locked.set_subtitle(&t!("fn_key_locked_subtitle"));
+        row_locked.add_prefix(&check_locked);
+        row_locked.set_activatable_widget(Some(&check_locked));
 
-        let zeile_normal = adw::ActionRow::new();
-        zeile_normal.set_title(&t!("fn_key_normal_title"));
-        zeile_normal.set_subtitle(&t!("fn_key_normal_subtitle"));
-        zeile_normal.add_prefix(&check_normal);
-        zeile_normal.set_activatable_widget(Some(&check_normal));
+        let row_normal = adw::ActionRow::new();
+        row_normal.set_title(&t!("fn_key_normal_title"));
+        row_normal.set_subtitle(&t!("fn_key_normal_subtitle"));
+        row_normal.add_prefix(&check_normal);
+        row_normal.set_activatable_widget(Some(&check_normal));
 
         let model = FnKeyModel {
-            gesperrt,
-            zeile_hinweis,
-            zeile_gesperrt,
-            zeile_normal,
+            locked,
+            row_hint,
+            row_locked,
+            row_normal,
         };
 
         let widgets = view_output!();
@@ -108,15 +108,15 @@ impl Component for FnKeyModel {
 
     fn update(&mut self, msg: FnKeyMsg, sender: ComponentSender<Self>, _root: &Self::Root) {
         match msg {
-            FnKeyMsg::GesperrtUmschalten(gesperrt) => {
-                if gesperrt == self.gesperrt {
+            FnKeyMsg::ToggleLocked(locked) => {
+                if locked == self.locked {
                     return;
                 }
-                self.gesperrt = gesperrt;
+                self.locked = locked;
 
                 let args_flag = format!(
                     "--args=asus_wmi.fnlock_default={}",
-                    if gesperrt { "0" } else { "1" }
+                    if locked { "0" } else { "1" }
                 );
 
                 sender.command(move |out, shutdown| {
@@ -134,7 +134,7 @@ impl Component for FnKeyModel {
                             .await;
 
                             match result {
-                                Ok(()) => out.emit(FnKeyCommandOutput::Gesetzt(gesperrt)),
+                                Ok(()) => out.emit(FnKeyCommandOutput::Set(locked)),
                                 Err(e) => out.emit(FnKeyCommandOutput::Fehler(e)),
                             }
                         })
@@ -151,18 +151,18 @@ impl Component for FnKeyModel {
         _root: &Self::Root,
     ) {
         match msg {
-            FnKeyCommandOutput::Gesetzt(gesperrt) => {
-                AppConfig::update(|c| c.input_fn_key_gesperrt = gesperrt);
-                let mode = if gesperrt {
+            FnKeyCommandOutput::Set(locked) => {
+                AppConfig::update(|c| c.input_fn_key_gesperrt = locked);
+                let mode = if locked {
                     t!("fn_key_mode_locked")
                 } else {
                     t!("fn_key_mode_normal")
                 };
-                self.zeile_hinweis
+                self.row_hint
                     .set_subtitle(&t!("fn_key_saved", mode = mode));
             }
             FnKeyCommandOutput::Fehler(e) => {
-                self.zeile_hinweis
+                self.row_hint
                     .set_subtitle(&t!("fn_key_save_error", error = e.clone()));
                 let _ = sender.output(e);
             }

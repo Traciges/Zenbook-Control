@@ -3,6 +3,7 @@ use gtk4::prelude::ApplicationExt;
 use ksni::menu::StandardItem;
 use ksni::{Icon, MenuItem, Tray};
 use relm4::Sender;
+use rust_i18n::t;
 
 pub struct AsusTray {
     pub app_sender: Sender<AppMsg>,
@@ -19,9 +20,10 @@ impl Tray for AsusTray {
 
     fn icon_pixmap(&self) -> Vec<Icon> {
         let png_bytes = include_bytes!("../assets/trayicon.png");
-        let img = image::load_from_memory(png_bytes)
-            .expect("Failed to load tray icon")
-            .into_rgba8();
+        let Ok(img) = image::load_from_memory(png_bytes) else {
+            return vec![];
+        };
+        let img = img.into_rgba8();
         let (width, height) = img.dimensions();
         let data: Vec<u8> = img
             .pixels()
@@ -38,7 +40,7 @@ impl Tray for AsusTray {
         let sender_show = self.app_sender.clone();
         vec![
             MenuItem::Standard(StandardItem {
-                label: "Anzeigen".into(),
+                label: t!("tray_show").to_string(),
                 activate: Box::new(move |_| {
                     sender_show.emit(AppMsg::ShowWindow);
                 }),
@@ -46,7 +48,7 @@ impl Tray for AsusTray {
             }),
             MenuItem::Separator,
             MenuItem::Standard(StandardItem {
-                label: "Beenden".into(),
+                label: t!("tray_exit").to_string(),
                 activate: Box::new(|_| {
                     relm4::main_application().quit();
                 }),

@@ -20,19 +20,19 @@ trait BrightnessControl {
 }
 
 pub struct OledDimmingModel {
-    helligkeit: u32,
+    brightness: u32,
 }
 
 #[derive(Debug)]
 pub enum OledDimmingMsg {
-    HelligkeitSetzen(u32),
+    SetBrightness(u32),
 }
 
 #[derive(Debug)]
 pub enum OledDimmingCommandOutput {
-    Gesetzt(u32),
+    Set(u32),
     Fehler(String),
-    HelligkeitGeaendert,
+    BrightnessChanged,
 }
 
 #[relm4::component(pub)]
@@ -66,16 +66,16 @@ impl Component for OledDimmingModel {
                     set_range: (10.0, 100.0),
                     set_increments: (5.0, 10.0),
                     set_round_digits: 0,
-                    set_value: model.helligkeit as f64,
+                    set_value: model.brightness as f64,
                     set_width_request: 200,
                     connect_value_changed[sender] => move |scale| {
-                        sender.input(OledDimmingMsg::HelligkeitSetzen(scale.value() as u32));
+                        sender.input(OledDimmingMsg::SetBrightness(scale.value() as u32));
                     },
                 },
 
                 add_suffix = &gtk::Label {
                     #[watch]
-                    set_label: &format!("{}%", model.helligkeit),
+                    set_label: &format!("{}%", model.brightness),
                     set_width_chars: 4,
                     set_xalign: 1.0,
                 },
@@ -89,17 +89,17 @@ impl Component for OledDimmingModel {
         sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
         let config = AppConfig::load();
-        let helligkeit = config.oled_dc_dimming;
+        let brightness = config.oled_dc_dimming;
 
-        let model = OledDimmingModel { helligkeit };
+        let model = OledDimmingModel { brightness };
         let widgets = view_output!();
 
-        if helligkeit < 100 {
+        if brightness < 100 {
             sender.command(move |out, shutdown| {
                 shutdown
                     .register(async move {
-                        match kscreen_doctor_helligkeit(helligkeit).await {
-                            Ok(()) => out.emit(OledDimmingCommandOutput::Gesetzt(helligkeit)),
+                        match apply_dimming(brightness).await {
+                            Ok(()) => out.emit(OledDimmingCommandOutput::Set(brightness)),
                             Err(e) => out.emit(OledDimmingCommandOutput::Fehler(e)),
                         }
                     })
@@ -115,18 +115,18 @@ impl Component for OledDimmingModel {
 
     fn update(&mut self, msg: OledDimmingMsg, sender: ComponentSender<Self>, _root: &Self::Root) {
         match msg {
-            OledDimmingMsg::HelligkeitSetzen(wert) => {
-                if wert == self.helligkeit {
+            OledDimmingMsg::SetBrightness(value) => {
+                if value == self.brightness {
                     return;
                 }
-                self.helligkeit = wert;
-                AppConfig::update(|c| c.oled_dc_dimming = wert);
+                self.brightness = value;
+                AppConfig::update(|c| c.oled_dc_dimming = value);
 
                 sender.command(move |out, shutdown| {
                     shutdown
                         .register(async move {
-                            match kscreen_doctor_helligkeit(wert).await {
-                                Ok(()) => out.emit(OledDimmingCommandOutput::Gesetzt(wert)),
+                            match apply_dimming(value).await {
+                                Ok(()) => out.emit(OledDimmingCommandOutput::Set(value)),
                                 Err(e) => out.emit(OledDimmingCommandOutput::Fehler(e)),
                             }
                         })
@@ -143,21 +143,21 @@ impl Component for OledDimmingModel {
         _root: &Self::Root,
     ) {
         match msg {
-            OledDimmingCommandOutput::Gesetzt(wert) => {
-                eprintln!("{}", t!("oled_dimming_set", value = wert.to_string()));
+            OledDimmingCommandOutput::Set(value) => {
+                tracing::info!("{}", t!("oled_dimming_set", value = value.to_string()));
             }
             OledDimmingCommandOutput::Fehler(e) => {
                 let _ = sender.output(e);
             }
-            OledDimmingCommandOutput::HelligkeitGeaendert => {
-                let wert = self.helligkeit;
-                if wert < 100 {
+            OledDimmingCommandOutput::BrightnessChanged => {
+                let value = self.brightness;
+                if value < 100 {
                     sender.command(move |out, shutdown| {
                         shutdown
                             .register(async move {
                                 tokio::time::sleep(std::time::Duration::from_millis(500)).await;
-                                match kscreen_doctor_helligkeit(wert).await {
-                                    Ok(()) => out.emit(OledDimmingCommandOutput::Gesetzt(wert)),
+                                match apply_dimming(value).await {
+                                    Ok(()) => out.emit(OledDimmingCommandOutput::Set(value)),
                                     Err(e) => out.emit(OledDimmingCommandOutput::Fehler(e)),
                                 }
                             })
@@ -169,8 +169,8 @@ impl Component for OledDimmingModel {
     }
 }
 
-async fn kscreen_doctor_helligkeit(wert: u32) -> Result<(), String> {
-    let arg = format!("output.{}.dimming.{}", DISPLAY_NAME, wert);
+async fn apply_dimming(value: u32) -> Result<(), String> {
+    let arg = format!("output.{}.dimming.{}", DISPLAY_NAME, value);
     run_command_blocking("kscreen-doctor", &[&arg]).await
 }
 
@@ -188,6 +188,6 @@ async fn start_brightness_listener(out: relm4::Sender<OledDimmingCommandOutput>)
         Err(_) => return,
     };
     while stream.next().await.is_some() {
-        out.emit(OledDimmingCommandOutput::HelligkeitGeaendert);
+        out.emit(OledDimmingCommandOutput::BrightnessChanged);
     }
 }

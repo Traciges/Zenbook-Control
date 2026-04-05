@@ -30,7 +30,7 @@ use rust_i18n::t;
 pub enum AppMsg {
     ShowWindow,
     Fehler(String),
-    SpracheSetzen(String),
+    SetLanguage(String),
 }
 
 pub struct AppModel {
@@ -40,14 +40,14 @@ pub struct AppModel {
     battery: Controller<BatteryModel>,
     fan: Controller<FanModel>,
     oled_dimming: Controller<OledDimmingModel>,
-    zielmodus: Controller<ZielmodusModel>,
+    target_mode: Controller<ZielmodusModel>,
     oled_care: Controller<OledCareModel>,
-    farbskala: Controller<FarbskalaModel>,
+    color_gamut: Controller<FarbskalaModel>,
     fn_key: Controller<FnKeyModel>,
-    gesten: Controller<GesturenModel>,
+    gestures: Controller<GesturenModel>,
     touchpad: Controller<TouchpadModel>,
-    auto_beleuchtung: Controller<AutoBeleuchtungModel>,
-    ruhezustand: Controller<RuhezustandModel>,
+    auto_backlight: Controller<AutoBeleuchtungModel>,
+    backlight_idle: Controller<RuhezustandModel>,
     sound_modes: Controller<SoundModesModel>,
     volume_widget: Controller<VolumeModel>,
 }
@@ -84,12 +84,12 @@ impl SimpleComponent for AppModel {
                 }
             }
             AppMsg::Fehler(text) => {
-                eprintln!("{} {}", t!("error_prefix"), text);
+                tracing::warn!("{} {}", t!("error_prefix"), text);
                 let toast = adw::Toast::new(&text);
                 toast.set_timeout(5);
                 self.toast_overlay.add_toast(toast);
             }
-            AppMsg::SpracheSetzen(lang) => {
+            AppMsg::SetLanguage(lang) => {
                 crate::services::config::AppConfig::update(|c| {
                     c.language = lang.clone();
                 });
@@ -106,46 +106,46 @@ impl SimpleComponent for AppModel {
         root: Self::Root,
         sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
-        let fehler = |msg: String| AppMsg::Fehler(msg);
+        let error_handler = |msg: String| AppMsg::Fehler(msg);
         let battery = BatteryModel::builder()
             .launch(())
-            .forward(sender.input_sender(), fehler);
+            .forward(sender.input_sender(), error_handler);
         let fan = FanModel::builder()
             .launch(())
-            .forward(sender.input_sender(), fehler);
+            .forward(sender.input_sender(), error_handler);
         let oled_dimming = OledDimmingModel::builder()
             .launch(())
-            .forward(sender.input_sender(), fehler);
-        let zielmodus = ZielmodusModel::builder()
+            .forward(sender.input_sender(), error_handler);
+        let target_mode = ZielmodusModel::builder()
             .launch(())
-            .forward(sender.input_sender(), fehler);
+            .forward(sender.input_sender(), error_handler);
         let oled_care = OledCareModel::builder()
             .launch(())
-            .forward(sender.input_sender(), fehler);
-        let farbskala = FarbskalaModel::builder()
+            .forward(sender.input_sender(), error_handler);
+        let color_gamut = FarbskalaModel::builder()
             .launch(())
-            .forward(sender.input_sender(), fehler);
+            .forward(sender.input_sender(), error_handler);
         let fn_key = FnKeyModel::builder()
             .launch(())
-            .forward(sender.input_sender(), fehler);
-        let gesten = GesturenModel::builder()
+            .forward(sender.input_sender(), error_handler);
+        let gestures = GesturenModel::builder()
             .launch(())
-            .forward(sender.input_sender(), fehler);
+            .forward(sender.input_sender(), error_handler);
         let touchpad = TouchpadModel::builder()
             .launch(())
-            .forward(sender.input_sender(), fehler);
-        let auto_beleuchtung = AutoBeleuchtungModel::builder()
+            .forward(sender.input_sender(), error_handler);
+        let auto_backlight = AutoBeleuchtungModel::builder()
             .launch(())
-            .forward(sender.input_sender(), fehler);
-        let ruhezustand = RuhezustandModel::builder()
+            .forward(sender.input_sender(), error_handler);
+        let backlight_idle = RuhezustandModel::builder()
             .launch(())
-            .forward(sender.input_sender(), fehler);
+            .forward(sender.input_sender(), error_handler);
         let sound_modes = SoundModesModel::builder()
             .launch(())
-            .forward(sender.input_sender(), fehler);
+            .forward(sender.input_sender(), error_handler);
         let volume_widget = VolumeModel::builder()
             .launch(())
-            .forward(sender.input_sender(), fehler);
+            .forward(sender.input_sender(), error_handler);
 
         let tray_svc = ksni::TrayService::new(tray::AsusTray {
             app_sender: sender.input_sender().clone(),
@@ -162,14 +162,14 @@ impl SimpleComponent for AppModel {
             battery,
             fan,
             oled_dimming,
-            zielmodus,
+            target_mode,
             oled_care,
-            farbskala,
+            color_gamut,
             fn_key,
-            gesten,
+            gestures,
             touchpad,
-            auto_beleuchtung,
-            ruhezustand,
+            auto_backlight,
+            backlight_idle,
             sound_modes,
             volume_widget,
         };
@@ -177,33 +177,33 @@ impl SimpleComponent for AppModel {
         let battery_widget = model.battery.widget();
         let fan_widget = model.fan.widget();
         let oled_dimming_widget = model.oled_dimming.widget();
-        let zielmodus_widget = model.zielmodus.widget();
+        let target_mode_widget = model.target_mode.widget();
         let oled_care_widget = model.oled_care.widget();
-        let farbskala_widget = model.farbskala.widget();
+        let color_gamut_widget = model.color_gamut.widget();
         let fn_key_widget = model.fn_key.widget();
-        let gesten_widget = model.gesten.widget();
+        let gestures_widget = model.gestures.widget();
         let touchpad_widget = model.touchpad.widget();
-        let auto_beleuchtung_widget = model.auto_beleuchtung.widget();
-        let ruhezustand_widget = model.ruhezustand.widget();
+        let auto_backlight_widget = model.auto_backlight.widget();
+        let backlight_idle_widget = model.backlight_idle.widget();
         let sound_modes_widget = model.sound_modes.widget();
         let volume_widget = model.volume_widget.widget();
 
-        // --- Content-Seiten ---
+        // --- Content pages ---
 
-        let anzeige_page = adw::PreferencesPage::new();
-        anzeige_page.add(oled_dimming_widget);
-        anzeige_page.add(zielmodus_widget);
-        anzeige_page.add(oled_care_widget);
-        anzeige_page.add(farbskala_widget);
+        let display_page = adw::PreferencesPage::new();
+        display_page.add(oled_dimming_widget);
+        display_page.add(target_mode_widget);
+        display_page.add(oled_care_widget);
+        display_page.add(color_gamut_widget);
 
-        let tastatur_page = adw::PreferencesPage::new();
-        tastatur_page.add(auto_beleuchtung_widget);
-        tastatur_page.add(ruhezustand_widget);
-        tastatur_page.add(fn_key_widget);
+        let keyboard_page = adw::PreferencesPage::new();
+        keyboard_page.add(auto_backlight_widget);
+        keyboard_page.add(backlight_idle_widget);
+        keyboard_page.add(fn_key_widget);
 
         let touchpad_page = adw::PreferencesPage::new();
         touchpad_page.add(touchpad_widget);
-        touchpad_page.add(gesten_widget);
+        touchpad_page.add(gestures_widget);
 
         let audio_page = adw::PreferencesPage::new();
         audio_page.add(volume_widget);
@@ -237,7 +237,7 @@ impl SimpleComponent for AppModel {
         lang_dropdown.connect_selected_notify(move |dd| {
             let idx = dd.selected() as usize;
             if let Some(&(_, code)) = SUPPORTED_LANGS.get(idx) {
-                sender_clone.input(AppMsg::SpracheSetzen(code.to_string()));
+                sender_clone.input(AppMsg::SetLanguage(code.to_string()));
             }
         });
 
@@ -247,7 +247,7 @@ impl SimpleComponent for AppModel {
 
         system_page.add(&lang_group);
 
-        // --- Widget-Map für Scroll-to-Widget ---
+        // --- Widget map for scroll-to-widget ---
 
         let widget_map = std::collections::HashMap::from([
             (
@@ -255,27 +255,27 @@ impl SimpleComponent for AppModel {
                 oled_dimming_widget.clone().upcast::<gtk4::Widget>(),
             ),
             (
-                "zielmodus",
-                zielmodus_widget.clone().upcast::<gtk4::Widget>(),
+                "target_mode",
+                target_mode_widget.clone().upcast::<gtk4::Widget>(),
             ),
             (
                 "oled_care",
                 oled_care_widget.clone().upcast::<gtk4::Widget>(),
             ),
             (
-                "farbskala",
-                farbskala_widget.clone().upcast::<gtk4::Widget>(),
+                "color_gamut",
+                color_gamut_widget.clone().upcast::<gtk4::Widget>(),
             ),
             (
-                "auto_beleuchtung",
-                auto_beleuchtung_widget.clone().upcast::<gtk4::Widget>(),
+                "auto_backlight",
+                auto_backlight_widget.clone().upcast::<gtk4::Widget>(),
             ),
             (
-                "ruhezustand",
-                ruhezustand_widget.clone().upcast::<gtk4::Widget>(),
+                "backlight_idle",
+                backlight_idle_widget.clone().upcast::<gtk4::Widget>(),
             ),
             ("fn_key", fn_key_widget.clone().upcast::<gtk4::Widget>()),
-            ("gesten", gesten_widget.clone().upcast::<gtk4::Widget>()),
+            ("gestures", gestures_widget.clone().upcast::<gtk4::Widget>()),
             ("touchpad", touchpad_widget.clone().upcast::<gtk4::Widget>()),
             ("volume", volume_widget.clone().upcast::<gtk4::Widget>()),
             (
@@ -287,13 +287,13 @@ impl SimpleComponent for AppModel {
             ("lang", lang_group.clone().upcast::<gtk4::Widget>()),
         ]);
 
-        // --- ViewStack für den Content-Bereich ---
+        // --- ViewStack for the content area ---
 
         let content_stack = adw::ViewStack::new();
         content_stack.set_transition_duration(250);
         content_stack.set_enable_transitions(true);
-        content_stack.add_named(&anzeige_page, Some("display"));
-        content_stack.add_named(&tastatur_page, Some("keyboard"));
+        content_stack.add_named(&display_page, Some("display"));
+        content_stack.add_named(&keyboard_page, Some("keyboard"));
         content_stack.add_named(&touchpad_page, Some("touchpad"));
         content_stack.add_named(&audio_page, Some("audio"));
         content_stack.add_named(&system_page, Some("system"));
@@ -330,7 +330,6 @@ impl SimpleComponent for AppModel {
             sidebar_list.append(&row);
         }
 
-        // Seitenleisten-Auswahl → Stack-Seite + Header-Titel aktualisieren
         let stack_c = content_stack.clone();
         let nav_page_c = content_nav_page.clone();
         let sorted_nav_c = sorted_nav.clone();
@@ -348,7 +347,7 @@ impl SimpleComponent for AppModel {
             sidebar_list.select_row(Some(&first_row));
         }
 
-        // --- Suche ---
+        // --- Search ---
 
         let search_widgets = crate::search::setup(
             (*sorted_nav).clone(),
@@ -383,7 +382,7 @@ impl SimpleComponent for AppModel {
         sidebar_toolbar.add_top_bar(&search_widgets.bar);
         sidebar_toolbar.set_content(Some(&sidebar_list));
 
-        // --- Bottom-Bar: GitHub + "Made by Guido" + Version ---
+        // --- Bottom bar: GitHub + "Made by Guido" + version ---
         {
             let bottom_box = gtk4::Box::new(gtk4::Orientation::Horizontal, 0);
             bottom_box.set_margin_top(6);
@@ -402,8 +401,6 @@ impl SimpleComponent for AppModel {
                 github_btn.set_child(Some(&gh_icon));
             }
             github_btn.connect_clicked(|_| {
-                // xdg-open nutzen und den Browser in eine komplett neue Prozessgruppe (0) auslagern,
-                // damit STRG+C im Terminal ihn nicht mitreißt.
                 let _ = Command::new("xdg-open")
                     .arg("https://github.com/Traciges")
                     .process_group(0)
@@ -430,7 +427,7 @@ impl SimpleComponent for AppModel {
 
         let sidebar_nav_page = adw::NavigationPage::new(&sidebar_toolbar, &t!("app_title"));
 
-        // --- Widget-Baum erzeugen ---
+        // --- Build widget tree ---
 
         let widgets = view_output!();
 

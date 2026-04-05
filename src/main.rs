@@ -23,6 +23,7 @@ fn load_css() {
 }
 
 fn main() {
+    tracing_subscriber::fmt::init();
     let config = services::config::AppConfig::load();
     rust_i18n::set_locale(&config.language);
     let a = relm4::RelmApp::new("de.guido.asus-hub");

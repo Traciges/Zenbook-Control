@@ -9,29 +9,29 @@ use crate::services::config::AppConfig;
 use crate::services::dbus;
 
 pub struct BatteryModel {
-    asusd_verfuegbar: bool,
-    wartungsmodus_aktiv: bool,
-    volle_aufladung_aktiv: bool,
-    tiefschlaf_aktiv: bool,
-    timer_abbrechen: Option<tokio::sync::oneshot::Sender<()>>,
+    asusd_available: bool,
+    maintenance_mode_active: bool,
+    full_charge_active: bool,
+    deep_sleep_active: bool,
+    timer_cancel: Option<tokio::sync::oneshot::Sender<()>>,
 }
 
 #[derive(Debug)]
 pub enum BatteryMsg {
-    WartungsmodusUmschalten(bool),
-    VolleAufladungUmschalten(bool),
-    TiefschlafhilfeUmschalten(bool),
+    ToggleMaintenanceMode(bool),
+    ToggleFullCharge(bool),
+    ToggleDeepSleep(bool),
 }
 
 #[derive(Debug)]
 pub enum BatteryCommandOutput {
-    AsusdGeprueft(bool),
-    LadelimitGesetzt(u8),
+    AsusdChecked(bool),
+    ChargeLimitSet(u8),
     Fehler(String),
-    TimerAbgelaufen,
-    InitWert(u8),
-    InitTiefschlaf(bool),
-    TiefschlafGesetzt(bool),
+    TimerElapsed,
+    InitValue(u8),
+    InitDeepSleep(bool),
+    DeepSleepSet(bool),
 }
 
 #[relm4::component(pub)]
@@ -48,7 +48,7 @@ impl Component for BatteryModel {
 
             add = &gtk::Label {
                 #[watch]
-                set_visible: !model.asusd_verfuegbar,
+                set_visible: !model.asusd_available,
                 set_label: &t!("asusd_missing_warning"),
                 add_css_class: "error",
                 set_wrap: true,
@@ -64,13 +64,13 @@ impl Component for BatteryModel {
                 set_subtitle: &t!("battery_maintenance_subtitle"),
 
                 #[watch]
-                set_active: model.wartungsmodus_aktiv,
+                set_active: model.maintenance_mode_active,
 
                 #[watch]
-                set_sensitive: model.asusd_verfuegbar,
+                set_sensitive: model.asusd_available,
 
                 connect_active_notify[sender] => move |switch| {
-                    sender.input(BatteryMsg::WartungsmodusUmschalten(switch.is_active()));
+                    sender.input(BatteryMsg::ToggleMaintenanceMode(switch.is_active()));
                 },
             },
 
@@ -79,13 +79,13 @@ impl Component for BatteryModel {
                 set_subtitle: &t!("battery_full_charge_subtitle"),
 
                 #[watch]
-                set_active: model.volle_aufladung_aktiv,
+                set_active: model.full_charge_active,
 
                 #[watch]
-                set_sensitive: model.asusd_verfuegbar && model.wartungsmodus_aktiv,
+                set_sensitive: model.asusd_available && model.maintenance_mode_active,
 
                 connect_active_notify[sender] => move |switch| {
-                    sender.input(BatteryMsg::VolleAufladungUmschalten(switch.is_active()));
+                    sender.input(BatteryMsg::ToggleFullCharge(switch.is_active()));
                 },
             },
 
@@ -94,10 +94,10 @@ impl Component for BatteryModel {
                 set_subtitle: &t!("battery_deep_sleep_subtitle"),
 
                 #[watch]
-                set_active: model.tiefschlaf_aktiv,
+                set_active: model.deep_sleep_active,
 
                 connect_active_notify[sender] => move |switch| {
-                    sender.input(BatteryMsg::TiefschlafhilfeUmschalten(switch.is_active()));
+                    sender.input(BatteryMsg::ToggleDeepSleep(switch.is_active()));
                 },
             },
         }
@@ -109,19 +109,19 @@ impl Component for BatteryModel {
         sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
         let model = BatteryModel {
-            asusd_verfuegbar: false,
-            wartungsmodus_aktiv: false,
-            volle_aufladung_aktiv: false,
-            tiefschlaf_aktiv: false,
-            timer_abbrechen: None,
+            asusd_available: false,
+            maintenance_mode_active: false,
+            full_charge_active: false,
+            deep_sleep_active: false,
+            timer_cancel: None,
         };
         let widgets = view_output!();
 
         sender.command(|out, shutdown| {
             shutdown
                 .register(async move {
-                    let verfuegbar = dbus::check_asusd_available().await;
-                    out.emit(BatteryCommandOutput::AsusdGeprueft(verfuegbar));
+                    let available = dbus::check_asusd_available().await;
+                    out.emit(BatteryCommandOutput::AsusdChecked(available));
                 })
                 .drop_on_shutdown()
         });
@@ -130,7 +130,7 @@ impl Component for BatteryModel {
             shutdown
                 .register(async move {
                     match dbus::get_charge_limit().await {
-                        Ok(val) => out.emit(BatteryCommandOutput::InitWert(val)),
+                        Ok(val) => out.emit(BatteryCommandOutput::InitValue(val)),
                         Err(e) => out.emit(BatteryCommandOutput::Fehler(e)),
                     }
                 })
@@ -142,8 +142,8 @@ impl Component for BatteryModel {
                 .register(async move {
                     match tokio::fs::read_to_string("/sys/power/mem_sleep").await {
                         Ok(content) => {
-                            let aktiv = content.contains("[deep]");
-                            out.emit(BatteryCommandOutput::InitTiefschlaf(aktiv));
+                            let active = content.contains("[deep]");
+                            out.emit(BatteryCommandOutput::InitDeepSleep(active));
                         }
                         Err(e) => {
                             out.emit(BatteryCommandOutput::Fehler(
@@ -160,15 +160,15 @@ impl Component for BatteryModel {
 
     fn update(&mut self, msg: BatteryMsg, sender: ComponentSender<Self>, _root: &Self::Root) {
         match msg {
-            BatteryMsg::WartungsmodusUmschalten(aktiv) => {
-                if aktiv == self.wartungsmodus_aktiv {
+            BatteryMsg::ToggleMaintenanceMode(active) => {
+                if active == self.maintenance_mode_active {
                     return;
                 }
-                self.wartungsmodus_aktiv = aktiv;
+                self.maintenance_mode_active = active;
 
-                if !aktiv {
-                    self.volle_aufladung_aktiv = false;
-                    if let Some(cancel) = self.timer_abbrechen.take() {
+                if !active {
+                    self.full_charge_active = false;
+                    if let Some(cancel) = self.timer_cancel.take() {
                         let _ = cancel.send(());
                     }
                     sender.command(|out, shutdown| {
@@ -188,38 +188,38 @@ impl Component for BatteryModel {
                     });
                 }
             }
-            BatteryMsg::TiefschlafhilfeUmschalten(aktiv) => {
-                if aktiv == self.tiefschlaf_aktiv {
+            BatteryMsg::ToggleDeepSleep(active) => {
+                if active == self.deep_sleep_active {
                     return;
                 }
-                self.tiefschlaf_aktiv = aktiv;
-                AppConfig::update(|c| c.battery_tiefschlaf_aktiv = aktiv);
-                let wert = if aktiv { "deep" } else { "s2idle" };
+                self.deep_sleep_active = active;
+                AppConfig::update(|c| c.battery_tiefschlaf_aktiv = active);
+                let value = if active { "deep" } else { "s2idle" };
                 sender.command(move |out, shutdown| {
                     shutdown
                         .register(async move {
-                            let cmd = format!("echo {wert} > /sys/power/mem_sleep");
+                            let cmd = format!("echo {value} > /sys/power/mem_sleep");
                             match pkexec_shell(&cmd).await {
-                                Ok(()) => out.emit(BatteryCommandOutput::TiefschlafGesetzt(aktiv)),
+                                Ok(()) => out.emit(BatteryCommandOutput::DeepSleepSet(active)),
                                 Err(e) => out.emit(BatteryCommandOutput::Fehler(e)),
                             }
                         })
                         .drop_on_shutdown()
                 });
             }
-            BatteryMsg::VolleAufladungUmschalten(aktiv) => {
-                if aktiv == self.volle_aufladung_aktiv {
+            BatteryMsg::ToggleFullCharge(active) => {
+                if active == self.full_charge_active {
                     return;
                 }
-                self.volle_aufladung_aktiv = aktiv;
+                self.full_charge_active = active;
 
-                if let Some(cancel) = self.timer_abbrechen.take() {
+                if let Some(cancel) = self.timer_cancel.take() {
                     let _ = cancel.send(());
                 }
 
-                if aktiv {
+                if active {
                     let (tx, rx) = tokio::sync::oneshot::channel::<()>();
-                    self.timer_abbrechen = Some(tx);
+                    self.timer_cancel = Some(tx);
 
                     sender.command(|out, shutdown| {
                         shutdown
@@ -228,7 +228,7 @@ impl Component for BatteryModel {
 
                                 tokio::select! {
                                     _ = tokio::time::sleep(std::time::Duration::from_secs(24 * 60 * 60)) => {
-                                        out.emit(BatteryCommandOutput::TimerAbgelaufen);
+                                        out.emit(BatteryCommandOutput::TimerElapsed);
                                     }
                                     _ = rx => {}
                                 }
@@ -255,22 +255,22 @@ impl Component for BatteryModel {
         _root: &Self::Root,
     ) {
         match msg {
-            BatteryCommandOutput::AsusdGeprueft(verfuegbar) => {
-                self.asusd_verfuegbar = verfuegbar;
+            BatteryCommandOutput::AsusdChecked(available) => {
+                self.asusd_available = available;
             }
-            BatteryCommandOutput::InitWert(val) => {
-                self.wartungsmodus_aktiv = val <= 80;
-                self.volle_aufladung_aktiv = false;
+            BatteryCommandOutput::InitValue(val) => {
+                self.maintenance_mode_active = val <= 80;
+                self.full_charge_active = false;
             }
-            BatteryCommandOutput::InitTiefschlaf(aktiv) => {
-                self.tiefschlaf_aktiv = aktiv;
+            BatteryCommandOutput::InitDeepSleep(active) => {
+                self.deep_sleep_active = active;
             }
-            BatteryCommandOutput::TiefschlafGesetzt(aktiv) => {
-                let value = if aktiv { "deep" } else { "s2idle" };
-                eprintln!("{}", t!("battery_deep_sleep_set", value = value));
+            BatteryCommandOutput::DeepSleepSet(active) => {
+                let value = if active { "deep" } else { "s2idle" };
+                tracing::info!("{}", t!("battery_deep_sleep_set", value = value));
             }
-            BatteryCommandOutput::LadelimitGesetzt(val) => {
-                eprintln!(
+            BatteryCommandOutput::ChargeLimitSet(val) => {
+                tracing::info!(
                     "{}",
                     t!("battery_charge_limit_set", value = val.to_string())
                 );
@@ -278,9 +278,9 @@ impl Component for BatteryModel {
             BatteryCommandOutput::Fehler(e) => {
                 let _ = sender.output(e);
             }
-            BatteryCommandOutput::TimerAbgelaufen => {
-                self.volle_aufladung_aktiv = false;
-                self.timer_abbrechen = None;
+            BatteryCommandOutput::TimerElapsed => {
+                self.full_charge_active = false;
+                self.timer_cancel = None;
                 sender.command(|out, shutdown| {
                     shutdown
                         .register(async move {
@@ -295,7 +295,7 @@ impl Component for BatteryModel {
 
 async fn emit_limit_result(out: &relm4::Sender<BatteryCommandOutput>, value: u8) {
     match dbus::set_charge_limit(value).await {
-        Ok(val) => out.emit(BatteryCommandOutput::LadelimitGesetzt(val)),
+        Ok(val) => out.emit(BatteryCommandOutput::ChargeLimitSet(val)),
         Err(e) => out.emit(BatteryCommandOutput::Fehler(e)),
     }
 }

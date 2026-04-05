@@ -10,13 +10,13 @@ use crate::services::config::AppConfig;
 use crate::services::edge_gestures;
 
 pub struct GesturenModel {
-    aktiv: bool,
+    active: bool,
     loop_tx: Option<watch::Sender<bool>>,
 }
 
 #[derive(Debug)]
 pub enum GesturenMsg {
-    GestenUmschalten(bool),
+    ToggleGestures(bool),
 }
 
 const GESTURE_IMG: &[u8] = include_bytes!("../../../assets/img/gesture.png");
@@ -37,7 +37,7 @@ impl Component for GesturenModel {
                 set_orientation: gtk::Orientation::Horizontal,
                 set_spacing: 24,
 
-                #[name = "gesten_bild"]
+                #[name = "gesture_image"]
                 append = &gtk::Picture {
                     set_width_request: 300,
                     set_valign: gtk::Align::Start,
@@ -52,10 +52,10 @@ impl Component for GesturenModel {
                         set_title: &t!("gestures_toggle_title"),
 
                         #[watch]
-                        set_active: model.aktiv,
+                        set_active: model.active,
 
                         connect_active_notify[sender] => move |s| {
-                            sender.input(GesturenMsg::GestenUmschalten(s.is_active()));
+                            sender.input(GesturenMsg::ToggleGestures(s.is_active()));
                         },
                     },
 
@@ -83,18 +83,18 @@ impl Component for GesturenModel {
         _root: Self::Root,
         sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
-        let aktiv = AppConfig::load().input_gesten_aktiv;
-        let loop_tx = if aktiv {
+        let active = AppConfig::load().input_gesten_aktiv;
+        let loop_tx = if active {
             Some(start_gesture_loop())
         } else {
             None
         };
-        let model = GesturenModel { aktiv, loop_tx };
+        let model = GesturenModel { active, loop_tx };
         let widgets = view_output!();
 
         let bytes = glib::Bytes::from_static(GESTURE_IMG);
         if let Ok(texture) = gdk::Texture::from_bytes(&bytes) {
-            widgets.gesten_bild.set_paintable(Some(&texture));
+            widgets.gesture_image.set_paintable(Some(&texture));
         }
 
         ComponentParts { model, widgets }
@@ -102,14 +102,14 @@ impl Component for GesturenModel {
 
     fn update(&mut self, msg: GesturenMsg, _sender: ComponentSender<Self>, _root: &Self::Root) {
         match msg {
-            GesturenMsg::GestenUmschalten(aktiv) => {
-                if aktiv == self.aktiv {
+            GesturenMsg::ToggleGestures(active) => {
+                if active == self.active {
                     return;
                 }
-                self.aktiv = aktiv;
-                AppConfig::update(|c| c.input_gesten_aktiv = aktiv);
+                self.active = active;
+                AppConfig::update(|c| c.input_gesten_aktiv = active);
 
-                if aktiv {
+                if active {
                     self.loop_tx = Some(start_gesture_loop());
                 } else {
                     // Dropping the sender causes the loop to exit

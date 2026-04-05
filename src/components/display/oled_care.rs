@@ -4,28 +4,28 @@ use relm4::adw::prelude::*;
 use relm4::prelude::*;
 use rust_i18n::t;
 
-use super::helpers::qdbus_ausfuehren;
+use super::helpers::run_qdbus;
 use crate::services::commands::run_command_blocking;
 use crate::services::config::AppConfig;
 
 pub struct OledCareModel {
-    pixel_refresh_aktiv: bool,
-    panel_ausblenden_aktiv: bool,
-    transparenz_aktiv: bool,
+    pixel_refresh_active: bool,
+    panel_autohide_active: bool,
+    transparency_active: bool,
 }
 
 #[derive(Debug)]
 pub enum OledCareMsg {
-    PixelRefreshUmschalten(bool),
-    PanelAusblendenUmschalten(bool),
-    TransparenzUmschalten(bool),
+    TogglePixelRefresh(bool),
+    TogglePanelAutohide(bool),
+    ToggleTransparency(bool),
 }
 
 #[derive(Debug)]
 pub enum OledCareCommandOutput {
-    PanelGesetzt(bool),
-    TransparenzGesetzt(bool),
-    PixelRefreshGesetzt(bool),
+    PanelSet(bool),
+    TransparencySet(bool),
+    PixelRefreshSet(bool),
     Fehler(String),
 }
 
@@ -57,10 +57,10 @@ impl Component for OledCareModel {
                 set_subtitle: &t!("oled_care_pixel_refresh_subtitle"),
 
                 #[watch]
-                set_active: model.pixel_refresh_aktiv,
+                set_active: model.pixel_refresh_active,
 
                 connect_active_notify[sender] => move |switch| {
-                    sender.input(OledCareMsg::PixelRefreshUmschalten(switch.is_active()));
+                    sender.input(OledCareMsg::TogglePixelRefresh(switch.is_active()));
                 },
             },
 
@@ -69,10 +69,10 @@ impl Component for OledCareModel {
                 set_subtitle: &t!("oled_care_panel_autohide_subtitle"),
 
                 #[watch]
-                set_active: model.panel_ausblenden_aktiv,
+                set_active: model.panel_autohide_active,
 
                 connect_active_notify[sender] => move |switch| {
-                    sender.input(OledCareMsg::PanelAusblendenUmschalten(switch.is_active()));
+                    sender.input(OledCareMsg::TogglePanelAutohide(switch.is_active()));
                 },
             },
 
@@ -81,10 +81,10 @@ impl Component for OledCareModel {
                 set_subtitle: &t!("oled_care_transparency_subtitle"),
 
                 #[watch]
-                set_active: model.transparenz_aktiv,
+                set_active: model.transparency_active,
 
                 connect_active_notify[sender] => move |switch| {
-                    sender.input(OledCareMsg::TransparenzUmschalten(switch.is_active()));
+                    sender.input(OledCareMsg::ToggleTransparency(switch.is_active()));
                 },
             },
         }
@@ -97,9 +97,9 @@ impl Component for OledCareModel {
     ) -> ComponentParts<Self> {
         let config = AppConfig::load();
         let model = OledCareModel {
-            pixel_refresh_aktiv: config.oled_care_pixel_refresh,
-            panel_ausblenden_aktiv: config.oled_care_panel_autohide,
-            transparenz_aktiv: config.oled_care_transparenz,
+            pixel_refresh_active: config.oled_care_pixel_refresh,
+            panel_autohide_active: config.oled_care_panel_autohide,
+            transparency_active: config.oled_care_transparenz,
         };
         let widgets = view_output!();
         ComponentParts { model, widgets }
@@ -107,15 +107,15 @@ impl Component for OledCareModel {
 
     fn update(&mut self, msg: OledCareMsg, sender: ComponentSender<Self>, _root: &Self::Root) {
         match msg {
-            OledCareMsg::PixelRefreshUmschalten(aktiv) => {
-                if aktiv == self.pixel_refresh_aktiv {
+            OledCareMsg::TogglePixelRefresh(active) => {
+                if active == self.pixel_refresh_active {
                     return;
                 }
-                self.pixel_refresh_aktiv = aktiv;
+                self.pixel_refresh_active = active;
 
-                AppConfig::update(|c| c.oled_care_pixel_refresh = aktiv);
+                AppConfig::update(|c| c.oled_care_pixel_refresh = active);
 
-                let idle_time = if aktiv { "300" } else { "600" };
+                let idle_time = if active { "300" } else { "600" };
                 sender.command(move |out, shutdown| {
                     shutdown
                         .register(async move {
@@ -136,7 +136,7 @@ impl Component for OledCareModel {
                             .await
                             {
                                 Ok(()) => {
-                                    out.emit(OledCareCommandOutput::PixelRefreshGesetzt(aktiv))
+                                    out.emit(OledCareCommandOutput::PixelRefreshSet(active))
                                 }
                                 Err(e) => out.emit(OledCareCommandOutput::Fehler(e)),
                             }
@@ -144,15 +144,15 @@ impl Component for OledCareModel {
                         .drop_on_shutdown()
                 });
             }
-            OledCareMsg::PanelAusblendenUmschalten(aktiv) => {
-                if aktiv == self.panel_ausblenden_aktiv {
+            OledCareMsg::TogglePanelAutohide(active) => {
+                if active == self.panel_autohide_active {
                     return;
                 }
-                self.panel_ausblenden_aktiv = aktiv;
+                self.panel_autohide_active = active;
 
-                AppConfig::update(|c| c.oled_care_panel_autohide = aktiv);
+                AppConfig::update(|c| c.oled_care_panel_autohide = active);
 
-                let hiding = if aktiv { "autohide" } else { "none" };
+                let hiding = if active { "autohide" } else { "none" };
                 let script = format!("panels().forEach(function(p){{p.hiding='{}';}})", hiding);
                 sender.command(move |out, shutdown| {
                     shutdown
@@ -160,22 +160,22 @@ impl Component for OledCareModel {
                             plasmashell_evaluate(
                                 &script,
                                 &out,
-                                OledCareCommandOutput::PanelGesetzt(aktiv),
+                                OledCareCommandOutput::PanelSet(active),
                             )
                             .await;
                         })
                         .drop_on_shutdown()
                 });
             }
-            OledCareMsg::TransparenzUmschalten(aktiv) => {
-                if aktiv == self.transparenz_aktiv {
+            OledCareMsg::ToggleTransparency(active) => {
+                if active == self.transparency_active {
                     return;
                 }
-                self.transparenz_aktiv = aktiv;
+                self.transparency_active = active;
 
-                AppConfig::update(|c| c.oled_care_transparenz = aktiv);
+                AppConfig::update(|c| c.oled_care_transparenz = active);
 
-                let opacity = if aktiv { "transparent" } else { "opaque" };
+                let opacity = if active { "transparent" } else { "opaque" };
                 let script = format!("panels().forEach(function(p){{p.opacity='{}';}})", opacity);
                 sender.command(move |out, shutdown| {
                     shutdown
@@ -183,7 +183,7 @@ impl Component for OledCareModel {
                             plasmashell_evaluate(
                                 &script,
                                 &out,
-                                OledCareCommandOutput::TransparenzGesetzt(aktiv),
+                                OledCareCommandOutput::TransparencySet(active),
                             )
                             .await;
                         })
@@ -200,17 +200,17 @@ impl Component for OledCareModel {
         _root: &Self::Root,
     ) {
         match msg {
-            OledCareCommandOutput::PanelGesetzt(aktiv) => {
-                let value = if aktiv { "autohide" } else { "none" };
-                eprintln!("{}", t!("oled_care_panel_set", value = value));
+            OledCareCommandOutput::PanelSet(active) => {
+                let value = if active { "autohide" } else { "none" };
+                tracing::info!("{}", t!("oled_care_panel_set", value = value));
             }
-            OledCareCommandOutput::TransparenzGesetzt(aktiv) => {
-                let value = if aktiv { "transparent" } else { "opaque" };
-                eprintln!("{}", t!("oled_care_transparency_set", value = value));
+            OledCareCommandOutput::TransparencySet(active) => {
+                let value = if active { "transparent" } else { "opaque" };
+                tracing::info!("{}", t!("oled_care_transparency_set", value = value));
             }
-            OledCareCommandOutput::PixelRefreshGesetzt(aktiv) => {
-                let value = if aktiv { "300s" } else { "600s" };
-                eprintln!("{}", t!("oled_care_dpms_set", value = value));
+            OledCareCommandOutput::PixelRefreshSet(active) => {
+                let value = if active { "300s" } else { "600s" };
+                tracing::info!("{}", t!("oled_care_dpms_set", value = value));
             }
             OledCareCommandOutput::Fehler(e) => {
                 let _ = sender.output(e);
@@ -219,11 +219,10 @@ impl Component for OledCareModel {
     }
 }
 
-/// Führt ein PlasmaShell evaluateScript via qdbus aus.
 async fn plasmashell_evaluate(
     script: &str,
     out: &relm4::Sender<OledCareCommandOutput>,
-    erfolg: OledCareCommandOutput,
+    success_output: OledCareCommandOutput,
 ) {
     let args = vec![
         "org.kde.plasmashell".to_string(),
@@ -231,8 +230,8 @@ async fn plasmashell_evaluate(
         "org.kde.PlasmaShell.evaluateScript".to_string(),
         script.to_string(),
     ];
-    match qdbus_ausfuehren(args).await {
-        Ok(()) => out.emit(erfolg),
+    match run_qdbus(args).await {
+        Ok(()) => out.emit(success_output),
         Err(e) => out.emit(OledCareCommandOutput::Fehler(e)),
     }
 }

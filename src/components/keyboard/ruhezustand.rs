@@ -6,37 +6,33 @@ use rust_i18n::t;
 
 use crate::services::config::AppConfig;
 
-// ──────────────────────────────────────────────────────────────────────────────
-// Ruhezustand der Tastaturhintergrundbeleuchtung
-// ──────────────────────────────────────────────────────────────────────────────
-
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
-pub(crate) enum TimeoutModus {
+pub(crate) enum TimeoutMode {
     #[default]
-    Nichts,
-    AkkuUndNetz,
-    NurAkku,
+    Never,
+    BatteryAndAc,
+    BatteryOnly,
 }
 
-impl From<u32> for TimeoutModus {
+impl From<u32> for TimeoutMode {
     fn from(v: u32) -> Self {
         match v {
-            1 => Self::AkkuUndNetz,
-            2 => Self::NurAkku,
-            _ => Self::Nichts,
+            1 => Self::BatteryAndAc,
+            2 => Self::BatteryOnly,
+            _ => Self::Never,
         }
     }
 }
 
-const TIMEOUT_SEKUNDEN: [u32; 3] = [60, 120, 300];
+const TIMEOUT_SECONDS: [u32; 3] = [60, 120, 300];
 
-fn busctl_brightness_cmd(wert: i32, nur_akku: bool) -> String {
+fn busctl_brightness_cmd(value: i32, battery_only: bool) -> String {
     let base = format!(
         "busctl call --system org.freedesktop.UPower \
          /org/freedesktop/UPower/KbdBacklight \
-         org.freedesktop.UPower.KbdBacklight SetBrightness i {wert}"
+         org.freedesktop.UPower.KbdBacklight SetBrightness i {value}"
     );
-    if nur_akku {
+    if battery_only {
         format!(
             "if [ \"$(cat /sys/class/power_supply/*/online | head -n1)\" = \"0\" ]; \
              then {base}; fi"
@@ -47,20 +43,20 @@ fn busctl_brightness_cmd(wert: i32, nur_akku: bool) -> String {
 }
 
 pub struct RuhezustandModel {
-    timeout_modus: TimeoutModus,
-    check_nichts: gtk::CheckButton,
-    check_akku_netz: gtk::CheckButton,
-    check_nur_akku: gtk::CheckButton,
-    dropdown_akku_netz: gtk::DropDown,
-    dropdown_nur_akku: gtk::DropDown,
+    timeout_mode: TimeoutMode,
+    check_never: gtk::CheckButton,
+    check_battery_and_ac: gtk::CheckButton,
+    check_battery_only: gtk::CheckButton,
+    dropdown_battery_and_ac: gtk::DropDown,
+    dropdown_battery_only: gtk::DropDown,
     swayidle_task: Option<tokio::task::JoinHandle<()>>,
 }
 
 #[derive(Debug)]
 pub enum RuhezustandMsg {
-    ModusWechseln(TimeoutModus),
-    AkkuNetzZeitGeaendert(u32),
-    NurAkkuZeitGeaendert(u32),
+    ChangeMode(TimeoutMode),
+    BatteryAndAcTimeChanged(u32),
+    BatteryOnlyTimeChanged(u32),
 }
 
 #[derive(Debug)]
@@ -83,29 +79,29 @@ impl Component for RuhezustandModel {
             add = &adw::ActionRow {
                 set_title: &t!("sleep_mode_never_title"),
                 set_subtitle: &t!("sleep_mode_never_subtitle"),
-                add_prefix = &model.check_nichts.clone(),
-                set_activatable_widget: Some(&model.check_nichts),
+                add_prefix = &model.check_never.clone(),
+                set_activatable_widget: Some(&model.check_never),
             },
 
             add = &adw::ActionRow {
                 set_title: &t!("sleep_mode_always_title"),
-                add_prefix = &model.check_akku_netz.clone(),
-                set_activatable_widget: Some(&model.check_akku_netz),
-                add_suffix = &model.dropdown_akku_netz.clone() -> gtk::DropDown {
+                add_prefix = &model.check_battery_and_ac.clone(),
+                set_activatable_widget: Some(&model.check_battery_and_ac),
+                add_suffix = &model.dropdown_battery_and_ac.clone() -> gtk::DropDown {
                     set_valign: gtk::Align::Center,
                     #[watch]
-                    set_sensitive: model.timeout_modus == TimeoutModus::AkkuUndNetz,
+                    set_sensitive: model.timeout_mode == TimeoutMode::BatteryAndAc,
                 },
             },
 
             add = &adw::ActionRow {
                 set_title: &t!("sleep_mode_battery_title"),
-                add_prefix = &model.check_nur_akku.clone(),
-                set_activatable_widget: Some(&model.check_nur_akku),
-                add_suffix = &model.dropdown_nur_akku.clone() -> gtk::DropDown {
+                add_prefix = &model.check_battery_only.clone(),
+                set_activatable_widget: Some(&model.check_battery_only),
+                add_suffix = &model.dropdown_battery_only.clone() -> gtk::DropDown {
                     set_valign: gtk::Align::Center,
                     #[watch]
-                    set_sensitive: model.timeout_modus == TimeoutModus::NurAkku,
+                    set_sensitive: model.timeout_mode == TimeoutMode::BatteryOnly,
                 },
             },
         }
@@ -117,88 +113,89 @@ impl Component for RuhezustandModel {
         sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
         let config = AppConfig::load();
-        let modus = TimeoutModus::from(config.kbd_timeout_modus);
+        let mode = TimeoutMode::from(config.kbd_timeout_modus);
 
-        let check_nichts = gtk::CheckButton::new();
-        let check_akku_netz = gtk::CheckButton::new();
-        let check_nur_akku = gtk::CheckButton::new();
-        check_akku_netz.set_group(Some(&check_nichts));
-        check_nur_akku.set_group(Some(&check_nichts));
+        let check_never = gtk::CheckButton::new();
+        let check_battery_and_ac = gtk::CheckButton::new();
+        let check_battery_only = gtk::CheckButton::new();
+        check_battery_and_ac.set_group(Some(&check_never));
+        check_battery_only.set_group(Some(&check_never));
 
-        match modus {
-            TimeoutModus::Nichts => check_nichts.set_active(true),
-            TimeoutModus::AkkuUndNetz => check_akku_netz.set_active(true),
-            TimeoutModus::NurAkku => check_nur_akku.set_active(true),
+        match mode {
+            TimeoutMode::Never => check_never.set_active(true),
+            TimeoutMode::BatteryAndAc => check_battery_and_ac.set_active(true),
+            TimeoutMode::BatteryOnly => check_battery_only.set_active(true),
         }
 
         let t1 = t!("sleep_timeout_1min");
         let t2 = t!("sleep_timeout_2min");
         let t5 = t!("sleep_timeout_5min");
-        let zeitoptionen = gtk::StringList::new(&[&t1, &t2, &t5]);
-        let dropdown_akku_netz =
-            gtk::DropDown::new(Some(zeitoptionen.clone()), gtk::Expression::NONE);
-        let dropdown_nur_akku = gtk::DropDown::new(Some(zeitoptionen), gtk::Expression::NONE);
-        dropdown_akku_netz.set_selected(config.kbd_timeout_akku_netz_index);
-        dropdown_nur_akku.set_selected(config.kbd_timeout_nur_akku_index);
+        let time_options = gtk::StringList::new(&[&t1, &t2, &t5]);
+        let dropdown_battery_and_ac =
+            gtk::DropDown::new(Some(time_options.clone()), gtk::Expression::NONE);
+        let dropdown_battery_only =
+            gtk::DropDown::new(Some(time_options), gtk::Expression::NONE);
+        dropdown_battery_and_ac.set_selected(config.kbd_timeout_akku_netz_index);
+        dropdown_battery_only.set_selected(config.kbd_timeout_nur_akku_index);
 
-        for (btn, modus_val) in [
-            (&check_nichts, TimeoutModus::Nichts),
-            (&check_akku_netz, TimeoutModus::AkkuUndNetz),
-            (&check_nur_akku, TimeoutModus::NurAkku),
+        for (btn, mode_val) in [
+            (&check_never, TimeoutMode::Never),
+            (&check_battery_and_ac, TimeoutMode::BatteryAndAc),
+            (&check_battery_only, TimeoutMode::BatteryOnly),
         ] {
             let sender = sender.clone();
             btn.connect_toggled(move |b| {
                 if b.is_active() {
-                    sender.input(RuhezustandMsg::ModusWechseln(modus_val));
+                    sender.input(RuhezustandMsg::ChangeMode(mode_val));
                 }
             });
         }
 
         {
             let sender = sender.clone();
-            dropdown_akku_netz.connect_selected_notify(move |dd| {
-                sender.input(RuhezustandMsg::AkkuNetzZeitGeaendert(dd.selected()));
+            dropdown_battery_and_ac.connect_selected_notify(move |dd| {
+                sender.input(RuhezustandMsg::BatteryAndAcTimeChanged(dd.selected()));
             });
         }
         {
             let sender = sender.clone();
-            dropdown_nur_akku.connect_selected_notify(move |dd| {
-                sender.input(RuhezustandMsg::NurAkkuZeitGeaendert(dd.selected()));
+            dropdown_battery_only.connect_selected_notify(move |dd| {
+                sender.input(RuhezustandMsg::BatteryOnlyTimeChanged(dd.selected()));
             });
         }
 
         let mut model = RuhezustandModel {
-            timeout_modus: modus,
-            check_nichts,
-            check_akku_netz,
-            check_nur_akku,
-            dropdown_akku_netz,
-            dropdown_nur_akku,
+            timeout_mode: mode,
+            check_never,
+            check_battery_and_ac,
+            check_battery_only,
+            dropdown_battery_and_ac,
+            dropdown_battery_only,
             swayidle_task: None,
         };
 
         let widgets = view_output!();
-        model.timeout_schreiben(modus, &sender);
+        model.apply_timeout(mode, &sender);
         ComponentParts { model, widgets }
     }
 
     fn update(&mut self, msg: RuhezustandMsg, sender: ComponentSender<Self>, _root: &Self::Root) {
         match msg {
-            RuhezustandMsg::ModusWechseln(modus) => {
-                self.timeout_modus = modus;
-                AppConfig::update(|c| c.kbd_timeout_modus = modus as u32);
-                self.timeout_schreiben(modus, &sender);
+            RuhezustandMsg::ChangeMode(mode) => {
+                self.timeout_mode = mode;
+                AppConfig::update(|c| c.kbd_timeout_modus = mode as u32);
+                self.apply_timeout(mode, &sender);
             }
-            RuhezustandMsg::AkkuNetzZeitGeaendert(index) => {
+            RuhezustandMsg::BatteryAndAcTimeChanged(index) => {
                 AppConfig::update(|c| c.kbd_timeout_akku_netz_index = index);
-                if self.timeout_modus == TimeoutModus::AkkuUndNetz {
-                    self.timeout_schreiben(TimeoutModus::AkkuUndNetz, &sender);
+                if self.timeout_mode == TimeoutMode::BatteryAndAc {
+                    self.apply_timeout(TimeoutMode::BatteryAndAc, &sender);
                 }
             }
-            RuhezustandMsg::NurAkkuZeitGeaendert(index) => {
+            RuhezustandMsg::BatteryOnlyTimeChanged(index) => {
                 AppConfig::update(|c| c.kbd_timeout_nur_akku_index = index);
-                if self.timeout_modus == TimeoutModus::NurAkku {
-                    self.timeout_schreiben(TimeoutModus::NurAkku, &sender);
+                if self.timeout_mode == TimeoutMode::BatteryOnly {
+                    self.apply_timeout(TimeoutMode::BatteryOnly, &sender);
                 }
             }
         }
@@ -219,35 +216,35 @@ impl Component for RuhezustandModel {
 }
 
 impl RuhezustandModel {
-    fn timeout_schreiben(
+    fn apply_timeout(
         &mut self,
-        modus: TimeoutModus,
+        mode: TimeoutMode,
         sender: &ComponentSender<RuhezustandModel>,
     ) {
         if let Some(task) = self.swayidle_task.take() {
             task.abort();
         }
 
-        if modus == TimeoutModus::Nichts {
+        if mode == TimeoutMode::Never {
             return;
         }
 
-        let sekunden = match modus {
-            TimeoutModus::Nichts => unreachable!(),
-            TimeoutModus::AkkuUndNetz => {
-                let idx = self.dropdown_akku_netz.selected() as usize;
-                *TIMEOUT_SEKUNDEN.get(idx).unwrap_or(&60)
+        let seconds = match mode {
+            TimeoutMode::Never => unreachable!(),
+            TimeoutMode::BatteryAndAc => {
+                let idx = self.dropdown_battery_and_ac.selected() as usize;
+                *TIMEOUT_SECONDS.get(idx).unwrap_or(&60)
             }
-            TimeoutModus::NurAkku => {
-                let idx = self.dropdown_nur_akku.selected() as usize;
-                *TIMEOUT_SEKUNDEN.get(idx).unwrap_or(&60)
+            TimeoutMode::BatteryOnly => {
+                let idx = self.dropdown_battery_only.selected() as usize;
+                *TIMEOUT_SECONDS.get(idx).unwrap_or(&60)
             }
         };
 
-        let nur_akku = modus == TimeoutModus::NurAkku;
-        let timeout_cmd = busctl_brightness_cmd(0, nur_akku);
-        let resume_cmd = busctl_brightness_cmd(3, nur_akku);
-        let sekunden_str = sekunden.to_string();
+        let battery_only = mode == TimeoutMode::BatteryOnly;
+        let timeout_cmd = busctl_brightness_cmd(0, battery_only);
+        let resume_cmd = busctl_brightness_cmd(3, battery_only);
+        let seconds_str = seconds.to_string();
 
         let cmd_sender = sender.command_sender().clone();
         let handle = tokio::spawn(async move {
@@ -256,7 +253,7 @@ impl RuhezustandModel {
                 .args([
                     "-w",
                     "timeout",
-                    &sekunden_str,
+                    &seconds_str,
                     &timeout_cmd,
                     "resume",
                     &resume_cmd,

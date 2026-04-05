@@ -3,28 +3,28 @@ use relm4::adw::prelude::*;
 use relm4::prelude::*;
 use rust_i18n::t;
 
-use crate::components::display::helpers::qdbus_ausfuehren;
+use crate::components::display::helpers::run_qdbus;
 use crate::services::commands::run_command_blocking;
 use crate::services::config::AppConfig;
 
 pub struct TouchpadModel {
-    touchpad_aktiv: bool,
+    touchpad_active: bool,
     countdown: u8,
-    bestaetigung_erforderlich: bool,
+    confirmation_required: bool,
     timer_handle: Option<tokio::task::JoinHandle<()>>,
 }
 
 #[derive(Debug)]
 pub enum TouchpadMsg {
-    TouchpadUmschalten(bool),
-    BestaetigungGeklickt,
+    ToggleTouchpad(bool),
+    ConfirmClicked,
 }
 
 #[derive(Debug)]
 pub enum TouchpadCommandOutput {
     Fehler(String),
     CountdownTick,
-    TimerAbgelaufen,
+    TimerElapsed,
 }
 
 #[relm4::component(pub)]
@@ -47,16 +47,16 @@ impl Component for TouchpadModel {
                     set_subtitle: &t!("touchpad_enable_subtitle"),
 
                     #[watch]
-                    set_active: model.touchpad_aktiv,
+                    set_active: model.touchpad_active,
 
                     connect_active_notify[sender] => move |s| {
-                        sender.input(TouchpadMsg::TouchpadUmschalten(s.is_active()));
+                        sender.input(TouchpadMsg::ToggleTouchpad(s.is_active()));
                     },
                 },
 
                 append = &adw::ActionRow {
                     #[watch]
-                    set_visible: model.bestaetigung_erforderlich,
+                    set_visible: model.confirmation_required,
 
                     #[watch]
                     set_title: &t!("touchpad_countdown_title", seconds = model.countdown.to_string()),
@@ -67,7 +67,7 @@ impl Component for TouchpadModel {
                         set_valign: gtk::Align::Center,
 
                         connect_clicked[sender] => move |_| {
-                            sender.input(TouchpadMsg::BestaetigungGeklickt);
+                            sender.input(TouchpadMsg::ConfirmClicked);
                         },
                     },
                 },
@@ -80,11 +80,11 @@ impl Component for TouchpadModel {
         _root: Self::Root,
         sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
-        let touchpad_aktiv = AppConfig::load().touchpad_aktiv;
+        let touchpad_active = AppConfig::load().touchpad_aktiv;
         let model = TouchpadModel {
-            touchpad_aktiv,
+            touchpad_active,
             countdown: 10,
-            bestaetigung_erforderlich: false,
+            confirmation_required: false,
             timer_handle: None,
         };
         let widgets = view_output!();
@@ -93,18 +93,18 @@ impl Component for TouchpadModel {
 
     fn update(&mut self, msg: TouchpadMsg, sender: ComponentSender<Self>, _root: &Self::Root) {
         match msg {
-            TouchpadMsg::TouchpadUmschalten(aktiv) => {
-                if aktiv == self.touchpad_aktiv {
+            TouchpadMsg::ToggleTouchpad(active) => {
+                if active == self.touchpad_active {
                     return;
                 }
-                self.touchpad_aktiv = aktiv;
+                self.touchpad_active = active;
 
                 if let Some(handle) = self.timer_handle.take() {
                     handle.abort();
                 }
 
-                if !aktiv {
-                    self.bestaetigung_erforderlich = true;
+                if !active {
+                    self.confirmation_required = true;
                     self.countdown = 10;
 
                     let cmd_sender = sender.command_sender().clone();
@@ -113,29 +113,29 @@ impl Component for TouchpadModel {
                             tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
                             cmd_sender.emit(TouchpadCommandOutput::CountdownTick);
                         }
-                        cmd_sender.emit(TouchpadCommandOutput::TimerAbgelaufen);
+                        cmd_sender.emit(TouchpadCommandOutput::TimerElapsed);
                     }));
                 } else {
-                    self.bestaetigung_erforderlich = false;
+                    self.confirmation_required = false;
                 }
 
-                AppConfig::update(|c| c.touchpad_aktiv = aktiv);
+                AppConfig::update(|c| c.touchpad_aktiv = active);
 
                 sender.command(move |out, shutdown| {
                     shutdown
                         .register(async move {
-                            if let Err(e) = touchpad_befehl_ausfuehren(aktiv).await {
+                            if let Err(e) = run_touchpad_command(active).await {
                                 out.emit(TouchpadCommandOutput::Fehler(e));
                             }
                         })
                         .drop_on_shutdown()
                 });
             }
-            TouchpadMsg::BestaetigungGeklickt => {
+            TouchpadMsg::ConfirmClicked => {
                 if let Some(handle) = self.timer_handle.take() {
                     handle.abort();
                 }
-                self.bestaetigung_erforderlich = false;
+                self.confirmation_required = false;
             }
         }
     }
@@ -150,12 +150,12 @@ impl Component for TouchpadModel {
             TouchpadCommandOutput::CountdownTick => {
                 self.countdown = self.countdown.saturating_sub(1);
             }
-            TouchpadCommandOutput::TimerAbgelaufen => {
-                if !self.bestaetigung_erforderlich {
+            TouchpadCommandOutput::TimerElapsed => {
+                if !self.confirmation_required {
                     return;
                 }
-                self.touchpad_aktiv = true;
-                self.bestaetigung_erforderlich = false;
+                self.touchpad_active = true;
+                self.confirmation_required = false;
                 self.timer_handle = None;
 
                 AppConfig::update(|c| c.touchpad_aktiv = true);
@@ -163,7 +163,7 @@ impl Component for TouchpadModel {
                 sender.command(move |out, shutdown| {
                     shutdown
                         .register(async move {
-                            if let Err(e) = touchpad_befehl_ausfuehren(true).await {
+                            if let Err(e) = run_touchpad_command(true).await {
                                 out.emit(TouchpadCommandOutput::Fehler(e));
                             }
                         })
@@ -177,33 +177,33 @@ impl Component for TouchpadModel {
     }
 }
 
-async fn touchpad_befehl_ausfuehren(aktiv: bool) -> Result<(), String> {
+async fn run_touchpad_command(active: bool) -> Result<(), String> {
     let desktop = std::env::var("XDG_CURRENT_DESKTOP")
         .unwrap_or_default()
         .to_lowercase();
 
     if desktop.contains("gnome") {
-        let wert = if aktiv { "enabled" } else { "disabled" };
+        let value = if active { "enabled" } else { "disabled" };
         run_command_blocking(
             "gsettings",
             &[
                 "set",
                 "org.gnome.desktop.peripherals.touchpad",
                 "send-events",
-                wert,
+                value,
             ],
         )
         .await
     } else if desktop.contains("kde") {
-        let methode = if aktiv {
+        let method = if active {
             "org.kde.touchpad.enable"
         } else {
             "org.kde.touchpad.disable"
         };
-        qdbus_ausfuehren(vec![
+        run_qdbus(vec![
             "org.kde.kglobalaccel".to_string(),
             "/modules/kded_touchpad".to_string(),
-            methode.to_string(),
+            method.to_string(),
         ])
         .await
         .map_err(|e| t!("error_touchpad_kde", error = e).to_string())

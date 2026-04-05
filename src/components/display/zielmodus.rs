@@ -3,24 +3,24 @@ use relm4::adw::prelude::*;
 use relm4::prelude::*;
 use rust_i18n::t;
 
-use super::helpers::qdbus_ausfuehren;
+use super::helpers::run_qdbus;
 use crate::services::commands::{is_kde_desktop, run_command_blocking};
 use crate::services::config::AppConfig;
 
 pub struct ZielmodusModel {
-    aktiv: bool,
-    kde_verfuegbar: bool,
+    active: bool,
+    kde_available: bool,
 }
 
 #[derive(Debug)]
 pub enum ZielmodusMsg {
-    AktivSetzen(bool),
+    SetActive(bool),
 }
 
 #[derive(Debug)]
 pub enum ZielmodusCommandOutput {
-    AktivGelesen(bool),
-    AktivGesetzt(bool),
+    ActiveRead(bool),
+    ActiveSet(bool),
     Fehler(String),
 }
 
@@ -38,7 +38,7 @@ impl Component for ZielmodusModel {
 
             add = &gtk::Label {
                 #[watch]
-                set_visible: !model.kde_verfuegbar,
+                set_visible: !model.kde_available,
                 set_label: &t!("zielmodus_kde_required"),
                 add_css_class: "error",
                 set_wrap: true,
@@ -54,12 +54,12 @@ impl Component for ZielmodusModel {
                 set_subtitle: &t!("zielmodus_switch_subtitle"),
 
                 #[watch]
-                set_active: model.aktiv,
+                set_active: model.active,
                 #[watch]
-                set_sensitive: model.kde_verfuegbar,
+                set_sensitive: model.kde_available,
 
                 connect_active_notify[sender] => move |switch| {
-                    sender.input(ZielmodusMsg::AktivSetzen(switch.is_active()));
+                    sender.input(ZielmodusMsg::SetActive(switch.is_active()));
                 },
             },
         }
@@ -71,27 +71,27 @@ impl Component for ZielmodusModel {
         sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
         let config = AppConfig::load();
-        let kde_verfuegbar = is_kde_desktop();
+        let kde_available = is_kde_desktop();
 
         let model = ZielmodusModel {
-            aktiv: config.zielmodus_aktiv,
-            kde_verfuegbar,
+            active: config.zielmodus_aktiv,
+            kde_available,
         };
         let widgets = view_output!();
 
-        if kde_verfuegbar {
+        if kde_available {
             let fallback = config.zielmodus_aktiv;
             sender.command(move |out, shutdown| {
                 shutdown
                     .register(async move {
-                        let aktiv = tokio::task::spawn_blocking(move || {
-                            lese_kwin_bool("Plugins", "diminactiveEnabled")
+                        let active = tokio::task::spawn_blocking(move || {
+                            read_kwin_bool("Plugins", "diminactiveEnabled")
                         })
                         .await
                         .ok()
                         .flatten()
                         .unwrap_or(fallback);
-                        out.emit(ZielmodusCommandOutput::AktivGelesen(aktiv));
+                        out.emit(ZielmodusCommandOutput::ActiveRead(active));
                     })
                     .drop_on_shutdown()
             });
@@ -102,18 +102,18 @@ impl Component for ZielmodusModel {
 
     fn update(&mut self, msg: ZielmodusMsg, sender: ComponentSender<Self>, _root: &Self::Root) {
         match msg {
-            ZielmodusMsg::AktivSetzen(aktiv) => {
-                if aktiv == self.aktiv {
+            ZielmodusMsg::SetActive(active) => {
+                if active == self.active {
                     return;
                 }
-                self.aktiv = aktiv;
-                AppConfig::update(|c| c.zielmodus_aktiv = aktiv);
+                self.active = active;
+                AppConfig::update(|c| c.zielmodus_aktiv = active);
 
                 sender.command(move |out, shutdown| {
                     shutdown
                         .register(async move {
-                            match kwin_effekt_setzen(aktiv).await {
-                                Ok(()) => out.emit(ZielmodusCommandOutput::AktivGesetzt(aktiv)),
+                            match set_kwin_effect(active).await {
+                                Ok(()) => out.emit(ZielmodusCommandOutput::ActiveSet(active)),
                                 Err(e) => out.emit(ZielmodusCommandOutput::Fehler(e)),
                             }
                         })
@@ -130,12 +130,12 @@ impl Component for ZielmodusModel {
         _root: &Self::Root,
     ) {
         match msg {
-            ZielmodusCommandOutput::AktivGelesen(aktiv) => {
-                self.aktiv = aktiv;
-                AppConfig::update(|c| c.zielmodus_aktiv = aktiv);
+            ZielmodusCommandOutput::ActiveRead(active) => {
+                self.active = active;
+                AppConfig::update(|c| c.zielmodus_aktiv = active);
             }
-            ZielmodusCommandOutput::AktivGesetzt(aktiv) => {
-                eprintln!("{}", t!("zielmodus_aktiv_set", value = aktiv.to_string()));
+            ZielmodusCommandOutput::ActiveSet(active) => {
+                tracing::info!("{}", t!("zielmodus_aktiv_set", value = active.to_string()));
             }
             ZielmodusCommandOutput::Fehler(e) => {
                 let _ = sender.output(e);
@@ -144,8 +144,8 @@ impl Component for ZielmodusModel {
     }
 }
 
-async fn kwin_effekt_setzen(aktiv: bool) -> Result<(), String> {
-    let wert = if aktiv { "true" } else { "false" };
+async fn set_kwin_effect(active: bool) -> Result<(), String> {
+    let value = if active { "true" } else { "false" };
     run_command_blocking(
         "kwriteconfig6",
         &[
@@ -157,13 +157,13 @@ async fn kwin_effekt_setzen(aktiv: bool) -> Result<(), String> {
             "diminactiveEnabled",
             "--type",
             "bool",
-            wert,
+            value,
         ],
     )
     .await?;
 
-    let method = if aktiv { "loadEffect" } else { "unloadEffect" };
-    qdbus_ausfuehren(vec![
+    let method = if active { "loadEffect" } else { "unloadEffect" };
+    run_qdbus(vec![
         "org.kde.KWin".to_string(),
         "/Effects".to_string(),
         method.to_string(),
@@ -172,7 +172,7 @@ async fn kwin_effekt_setzen(aktiv: bool) -> Result<(), String> {
     .await
 }
 
-fn lese_kwin_bool(group: &str, key: &str) -> Option<bool> {
+fn read_kwin_bool(group: &str, key: &str) -> Option<bool> {
     let output = std::process::Command::new("kreadconfig6")
         .args([
             "--file",

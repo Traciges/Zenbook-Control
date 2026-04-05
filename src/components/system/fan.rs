@@ -9,22 +9,22 @@ use crate::services::dbus;
 use crate::services::dbus::FanProfile;
 
 pub struct FanModel {
-    asusd_verfuegbar: bool,
-    aktuelles_profil: FanProfile,
-    check_leistung: gtk::CheckButton,
-    check_standard: gtk::CheckButton,
-    check_fluester: gtk::CheckButton,
+    asusd_available: bool,
+    current_profile: FanProfile,
+    check_performance: gtk::CheckButton,
+    check_balanced: gtk::CheckButton,
+    check_quiet: gtk::CheckButton,
 }
 
 #[derive(Debug)]
 pub enum FanMsg {
-    ProfilWechseln(FanProfile),
+    ChangeProfile(FanProfile),
 }
 
 #[derive(Debug)]
 pub enum FanCommandOutput {
-    AsusdGeprueft(bool),
-    ProfilGesetzt(FanProfile),
+    AsusdChecked(bool),
+    ProfileSet(FanProfile),
     Fehler(String),
 }
 
@@ -42,7 +42,7 @@ impl Component for FanModel {
 
             add = &gtk::Label {
                 #[watch]
-                set_visible: !model.asusd_verfuegbar,
+                set_visible: !model.asusd_available,
                 set_label: &t!("asusd_missing_warning"),
                 add_css_class: "error",
                 set_wrap: true,
@@ -56,28 +56,28 @@ impl Component for FanModel {
             add = &adw::ActionRow {
                 set_title: &t!("fan_performance_title"),
                 set_subtitle: &t!("fan_performance_subtitle"),
-                add_prefix = &model.check_leistung.clone(),
-                set_activatable_widget: Some(&model.check_leistung),
+                add_prefix = &model.check_performance.clone(),
+                set_activatable_widget: Some(&model.check_performance),
                 #[watch]
-                set_sensitive: model.asusd_verfuegbar,
+                set_sensitive: model.asusd_available,
             },
 
             add = &adw::ActionRow {
                 set_title: &t!("fan_balanced_title"),
                 set_subtitle: &t!("fan_balanced_subtitle"),
-                add_prefix = &model.check_standard.clone(),
-                set_activatable_widget: Some(&model.check_standard),
+                add_prefix = &model.check_balanced.clone(),
+                set_activatable_widget: Some(&model.check_balanced),
                 #[watch]
-                set_sensitive: model.asusd_verfuegbar,
+                set_sensitive: model.asusd_available,
             },
 
             add = &adw::ActionRow {
                 set_title: &t!("fan_quiet_title"),
                 set_subtitle: &t!("fan_quiet_subtitle"),
-                add_prefix = &model.check_fluester.clone(),
-                set_activatable_widget: Some(&model.check_fluester),
+                add_prefix = &model.check_quiet.clone(),
+                set_activatable_widget: Some(&model.check_quiet),
                 #[watch]
-                set_sensitive: model.asusd_verfuegbar,
+                set_sensitive: model.asusd_available,
             },
         }
     }
@@ -87,40 +87,40 @@ impl Component for FanModel {
         _root: Self::Root,
         sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
-        let check_leistung = gtk::CheckButton::new();
-        let check_standard = gtk::CheckButton::new();
-        let check_fluester = gtk::CheckButton::new();
+        let check_performance = gtk::CheckButton::new();
+        let check_balanced = gtk::CheckButton::new();
+        let check_quiet = gtk::CheckButton::new();
 
-        check_standard.set_group(Some(&check_leistung));
-        check_fluester.set_group(Some(&check_leistung));
+        check_balanced.set_group(Some(&check_performance));
+        check_quiet.set_group(Some(&check_performance));
 
         let config = AppConfig::load();
-        let gespeichertes_profil = FanProfile::from(config.fan_profil);
-        match gespeichertes_profil {
-            FanProfile::Performance => check_leistung.set_active(true),
-            FanProfile::Balanced => check_standard.set_active(true),
-            FanProfile::Quiet => check_fluester.set_active(true),
+        let saved_profile = FanProfile::from(config.fan_profil);
+        match saved_profile {
+            FanProfile::Performance => check_performance.set_active(true),
+            FanProfile::Balanced => check_balanced.set_active(true),
+            FanProfile::Quiet => check_quiet.set_active(true),
         }
 
         for (btn, profile) in [
-            (&check_leistung, FanProfile::Performance),
-            (&check_standard, FanProfile::Balanced),
-            (&check_fluester, FanProfile::Quiet),
+            (&check_performance, FanProfile::Performance),
+            (&check_balanced, FanProfile::Balanced),
+            (&check_quiet, FanProfile::Quiet),
         ] {
             let sender = sender.clone();
             btn.connect_toggled(move |b| {
                 if b.is_active() {
-                    sender.input(FanMsg::ProfilWechseln(profile));
+                    sender.input(FanMsg::ChangeProfile(profile));
                 }
             });
         }
 
         let model = FanModel {
-            asusd_verfuegbar: false,
-            aktuelles_profil: gespeichertes_profil,
-            check_leistung,
-            check_standard,
-            check_fluester,
+            asusd_available: false,
+            current_profile: saved_profile,
+            check_performance,
+            check_balanced,
+            check_quiet,
         };
 
         let widgets = view_output!();
@@ -128,8 +128,8 @@ impl Component for FanModel {
         sender.command(|out, shutdown| {
             shutdown
                 .register(async move {
-                    let verfuegbar = dbus::check_asusd_available().await;
-                    out.emit(FanCommandOutput::AsusdGeprueft(verfuegbar));
+                    let available = dbus::check_asusd_available().await;
+                    out.emit(FanCommandOutput::AsusdChecked(available));
                 })
                 .drop_on_shutdown()
         });
@@ -138,11 +138,11 @@ impl Component for FanModel {
             shutdown
                 .register(async move {
                     match dbus::get_fan_profile().await {
-                        Ok(aktuell) if aktuell == gespeichertes_profil => {
-                            out.emit(FanCommandOutput::ProfilGesetzt(aktuell));
+                        Ok(current) if current == saved_profile => {
+                            out.emit(FanCommandOutput::ProfileSet(current));
                         }
-                        Ok(_) => match dbus::set_fan_profile(gespeichertes_profil).await {
-                            Ok(p) => out.emit(FanCommandOutput::ProfilGesetzt(p)),
+                        Ok(_) => match dbus::set_fan_profile(saved_profile).await {
+                            Ok(p) => out.emit(FanCommandOutput::ProfileSet(p)),
                             Err(e) => out.emit(FanCommandOutput::Fehler(e)),
                         },
                         Err(e) => out.emit(FanCommandOutput::Fehler(e)),
@@ -156,18 +156,18 @@ impl Component for FanModel {
 
     fn update(&mut self, msg: FanMsg, sender: ComponentSender<Self>, _root: &Self::Root) {
         match msg {
-            FanMsg::ProfilWechseln(profile) => {
-                if profile == self.aktuelles_profil {
+            FanMsg::ChangeProfile(profile) => {
+                if profile == self.current_profile {
                     return;
                 }
-                self.aktuelles_profil = profile;
+                self.current_profile = profile;
                 AppConfig::update(|c| c.fan_profil = profile as u32);
 
                 sender.command(move |out, shutdown| {
                     shutdown
                         .register(async move {
                             match dbus::set_fan_profile(profile).await {
-                                Ok(p) => out.emit(FanCommandOutput::ProfilGesetzt(p)),
+                                Ok(p) => out.emit(FanCommandOutput::ProfileSet(p)),
                                 Err(e) => out.emit(FanCommandOutput::Fehler(e)),
                             }
                         })
@@ -184,11 +184,11 @@ impl Component for FanModel {
         _root: &Self::Root,
     ) {
         match msg {
-            FanCommandOutput::AsusdGeprueft(verfuegbar) => {
-                self.asusd_verfuegbar = verfuegbar;
+            FanCommandOutput::AsusdChecked(available) => {
+                self.asusd_available = available;
             }
-            FanCommandOutput::ProfilGesetzt(profile) => {
-                eprintln!(
+            FanCommandOutput::ProfileSet(profile) => {
+                tracing::info!(
                     "{}",
                     t!("fan_profile_set", profile = format!("{:?}", profile))
                 );

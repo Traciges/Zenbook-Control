@@ -59,7 +59,7 @@ async fn run_action(program: &str, args: &[&str]) {
         .status()
         .await;
     if let Err(e) = result {
-        eprintln!(
+        tracing::warn!(
             "{}",
             t!(
                 "error_gesture_action",
@@ -74,7 +74,7 @@ pub async fn run_gesture_loop(mut shutdown: watch::Receiver<bool>) {
     let device = match find_touchpad() {
         Some(d) => d,
         None => {
-            eprintln!("{}", t!("error_no_touchpad"));
+            tracing::warn!("{}", t!("error_no_touchpad"));
             return;
         }
     };
@@ -82,7 +82,7 @@ pub async fn run_gesture_loop(mut shutdown: watch::Receiver<bool>) {
     let abs_state = match device.get_abs_state() {
         Ok(states) => states,
         Err(e) => {
-            eprintln!("{}", t!("error_abs_info", error = e.to_string()));
+            tracing::warn!("{}", t!("error_abs_info", error = e.to_string()));
             return;
         }
     };
@@ -98,7 +98,7 @@ pub async fn run_gesture_loop(mut shutdown: watch::Receiver<bool>) {
     let mut stream = match device.into_event_stream() {
         Ok(s) => s,
         Err(e) => {
-            eprintln!("Event-Stream oeffnen fehlgeschlagen: {e}");
+            tracing::warn!("Failed to open event stream: {e}");
             return;
         }
     };
@@ -112,7 +112,7 @@ pub async fn run_gesture_loop(mut shutdown: watch::Receiver<bool>) {
                 match result {
                     Ok(ev) => ev,
                     Err(e) => {
-                        eprintln!("{}", t!("error_event_read", error = e.to_string()));
+                        tracing::warn!("{}", t!("error_event_read", error = e.to_string()));
                         break;
                     }
                 }
