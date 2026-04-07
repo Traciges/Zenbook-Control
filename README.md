@@ -1,8 +1,34 @@
-# Asus Hub
+<h1 align="center">
+  <img src="assets/trayicon.png" alt="Asus Hub icon" width="128" height="128"/>
+  <br>
+  Asus Hub
+</h1>
 
-A centralized settings application for ASUS laptops on Linux — bringing together hardware controls, display tuning, audio profiles, and system management in one place.
+<p align="center">
+  A centralized settings application for ASUS laptops on Linux — bringing together hardware controls, display tuning, audio profiles, and system management in one place.
+</p>
 
-> **Tested on:** ASUS Zenbook S16 · Fedora 43 · KDE Plasma
+<p align="center">
+  <strong>Tested on:</strong> ASUS Zenbook S16 · Fedora 43 · KDE Plasma
+</p>
+
+---
+
+## Screenshots
+
+<p align="center">
+  <img src="screenshots/Display.png" alt="Display settings" width="45%"/>
+  &nbsp;
+  <img src="screenshots/Keyboard.png" alt="Keyboard settings" width="45%"/>
+</p>
+<p align="center">
+  <img src="screenshots/Audio.png" alt="Audio settings" width="45%"/>
+  &nbsp;
+  <img src="screenshots/Touchpad.png" alt="Touchpad settings" width="45%"/>
+</p>
+<p align="center">
+  <img src="screenshots/System.png" alt="System settings" width="45%"/>
+</p>
 
 ---
 
@@ -37,6 +63,10 @@ The application is smart about availability: if a required tool or desktop envir
 | Panel Auto-Hide *(KDE only)* | Automatically hides the KDE panel to reduce static OLED elements | KDE, `qdbus` |
 | Panel Transparency *(KDE only)* | Sets the KDE panel to transparent or opaque | KDE, `qdbus` |
 
+> **Bundled color gamut presets:** Native, sRGB, DCI-P3 and Display P3
+>
+> These presets are the original ASUS color gamut profiles.
+
 ### Keyboard
 
 | Feature | Description | Requires |
@@ -60,7 +90,8 @@ The application is smart about availability: if a required tool or desktop envir
 | Sound Profiles | Apply EasyEffects presets bundled with the app (see below) | `easyeffects` |
 
 > **Bundled EasyEffects presets:** Movie, Music, Perfect EQ, Video, Voice, Custom
-> These presets are **not** the original ASUS audio profiles — they are community-created EQ configurations included for convenience. They are automatically installed to the EasyEffects preset directory on first use.
+>
+> These presets are **not** the original ASUS audio profiles — they are [Community Presets](https://github.com/wwmm/easyeffects/wiki/Community-presets) from the EasyEffects project, included for convenience. They are automatically installed to the EasyEffects preset directory on first use.
 
 ### System
 
