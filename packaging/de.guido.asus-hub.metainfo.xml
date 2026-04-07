@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>de.guido.asus-hub</id>
+  <name>Asus Hub</name>
+  <summary>Unofficial Control Center for Asus Laptops</summary>
+
+  <metadata_license>FSFAP</metadata_license>
+  <project_license>GPL-3.0-or-later</project_license>
+  <developer_name>Guido</developer_name>
+
+  <description>
+    <p>
+      **This is a community package of Asus Hub and not officially supported by ASUS.**
+    </p>
+    <p>
+      Asus Hub is a lightweight, native Linux control center for Asus laptops (like Zenbook, Vivobook, and ROG).
+      It allows you to tweak deep hardware settings that are usually only available on Windows.
+    </p>
+    <ul>
+      <li>Battery Care: Set charging limits to 80% to prolong battery lifespan.</li>
+      <li>Fan Profiles: Switch between Whisper, Balanced, and Performance modes.</li>
+      <li>OLED Care: Manage pixel refresh and panel dimming.</li>
+      <li>Keyboard Backlight: Configure sleep timeouts and auto-brightness.</li>
+    </ul>
+  </description>
+
+  <screenshots>
+    <screenshot type="default">
+      <image>https://raw.githubusercontent.com/Traciges/Asus-Hub/refs/heads/main/screenshots/System.png</image>
+      <caption>The system overview and battery settings</caption>
+    </screenshot>
+    <screenshot>
+      <image>https://raw.githubusercontent.com/Traciges/Asus-Hub/refs/heads/main/screenshots/Display.png</image>
+      <caption>Display and OLED care settings</caption>
+    </screenshot>
+    <screenshot>
+      <image>https://raw.githubusercontent.com/Traciges/Asus-Hub/refs/heads/main/screenshots/Keyboard.png</image>
+      <caption>Keyboard backlight and gestures configuration</caption>
+    </screenshot>
+    <screenshot>
+      <image>https://raw.githubusercontent.com/Traciges/Asus-Hub/refs/heads/main/screenshots/Audio.png</image>
+      <caption>Audio and volume mode control</caption>
+    </screenshot>
+    <screenshot>
+      <image>https://raw.githubusercontent.com/Traciges/Asus-Hub/refs/heads/main/screenshots/Touchpad.png</image>
+      <caption>Touchpad and gesture settings</caption>
+    </screenshot>
+  </screenshots>
+
+  <launchable type="desktop-id">de.guido.asus-hub.desktop</launchable>
+
+  <url type="homepage">https://github.com/Traciges/Asus-Hub</url>
+  <url type="bugtracker">https://github.com/Traciges/Asus-Hub/issues</url>
+
+  <content_rating type="oars-1.1" />
+
+  <releases>
+    <release version="1.0.0" date="2026-04-07">
+      <description>
+        <p>Initial release of Asus Hub for Linux.</p>
+      </description>
+    </release>
+  </releases>
+</component>

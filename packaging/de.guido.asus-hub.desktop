@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Asus Hub
+Comment=Unofficial Control Center for Asus Laptops
+Exec=asus-hub
+Icon=de.guido.asus-hub
+Terminal=false
+StartupNotify=true
+Categories=Settings;HardwareSettings;System;
