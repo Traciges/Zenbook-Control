@@ -156,13 +156,11 @@ impl Component for BatteryModel {
                 .register(async move {
                     let available = dbus::check_asusd_available().await;
                     out.emit(BatteryCommandOutput::AsusdChecked(available));
-                })
-                .drop_on_shutdown()
-        });
 
-        sender.command(|out, shutdown| {
-            shutdown
-                .register(async move {
+                    if !available {
+                        return;
+                    }
+
                     match dbus::get_charge_limit().await {
                         Ok(val) => out.emit(BatteryCommandOutput::InitValue(val)),
                         Err(e) => out.emit(BatteryCommandOutput::Fehler(e)),

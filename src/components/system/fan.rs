@@ -150,18 +150,16 @@ impl Component for FanModel {
 
         let widgets = view_output!();
 
-        sender.command(|out, shutdown| {
+        sender.command(move |out, shutdown| {
             shutdown
                 .register(async move {
                     let available = dbus::check_asusd_available().await;
                     out.emit(FanCommandOutput::AsusdChecked(available));
-                })
-                .drop_on_shutdown()
-        });
 
-        sender.command(move |out, shutdown| {
-            shutdown
-                .register(async move {
+                    if !available {
+                        return;
+                    }
+
                     match dbus::get_fan_profile().await {
                         Ok(current) if current == saved_profile => {
                             out.emit(FanCommandOutput::ProfileSet(current));
