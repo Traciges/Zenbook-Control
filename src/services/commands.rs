@@ -53,6 +53,39 @@ pub(crate) async fn pkexec_shell(command: &str) -> Result<(), String> {
     run_command_blocking("pkexec", &["sh", "-c", command]).await
 }
 
+static QDBUS_PATH: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+
+/// Returns the path to the `qdbus` executable, resolved once and cached.
+///
+/// Checks in order: `qdbus` in `$PATH`, `/usr/lib/qt6/bin/qdbus` (Arch Linux Qt6),
+/// `/usr/lib/qt5/bin/qdbus` (Arch Linux Qt5). Falls back to `"qdbus"` if none are found.
+pub(crate) fn resolve_qdbus_path() -> &'static str {
+    QDBUS_PATH.get_or_init(|| {
+        if let Ok(path_var) = std::env::var("PATH") {
+            for dir in path_var.split(':') {
+                let candidate = std::path::Path::new(dir).join("qdbus");
+                if is_executable(&candidate) {
+                    return candidate.to_string_lossy().into_owned();
+                }
+            }
+        }
+        if is_executable(std::path::Path::new("/usr/lib/qt6/bin/qdbus")) {
+            return "/usr/lib/qt6/bin/qdbus".to_owned();
+        }
+        if is_executable(std::path::Path::new("/usr/lib/qt5/bin/qdbus")) {
+            return "/usr/lib/qt5/bin/qdbus".to_owned();
+        }
+        "qdbus".to_owned()
+    })
+}
+
+fn is_executable(path: &std::path::Path) -> bool {
+    use std::os::unix::fs::PermissionsExt;
+    std::fs::metadata(path)
+        .map(|m| m.is_file() && m.permissions().mode() & 0o111 != 0)
+        .unwrap_or(false)
+}
+
 /// Returns `true` if the current desktop session is KDE Plasma.
 ///
 /// Checks the `XDG_CURRENT_DESKTOP` environment variable for the substring `"KDE"` (case-insensitive).

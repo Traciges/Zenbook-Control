@@ -19,7 +19,7 @@
 //! ICC profiles are embedded in the binary at compile time and extracted to
 //! `~/.config/asus-hub/icm/` on first use. Profiles are applied via `kscreen-doctor`.
 
-use crate::services::commands::run_command_blocking;
+use crate::services::commands::{resolve_qdbus_path, run_command_blocking};
 use crate::services::config::AppConfig;
 use rust_i18n::t;
 
@@ -85,35 +85,13 @@ pub(crate) async fn apply_icm_profile(
     run_command_blocking("kscreen-doctor", &[&arg]).await
 }
 
-/// Invokes a D-Bus method via the `qdbus` command-line tool with Qt5/Qt6 fallback.
+/// Invokes a D-Bus method via the `qdbus` command-line tool.
 ///
-/// Tries `qdbus-qt6` first; if it is not found (`ENOENT`), falls back to `qdbus` (Qt5).
-/// This handles distros that ship only one of the two variants.
+/// The executable path is resolved once via [`resolve_qdbus_path`], which checks `$PATH` first,
+/// then falls back to known Arch Linux locations (`/usr/lib/qt6/bin/qdbus`,
+/// `/usr/lib/qt5/bin/qdbus`).
 pub(crate) async fn run_qdbus(args: Vec<String>) -> Result<(), String> {
-    let result = tokio::task::spawn_blocking(move || {
-        let status = std::process::Command::new("qdbus-qt6").args(&args).status();
-        match status {
-            Ok(s) => Ok(("qdbus-qt6", s)),
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-                std::process::Command::new("qdbus")
-                    .args(&args)
-                    .status()
-                    .map(|s| ("qdbus", s))
-            }
-            Err(e) => Err(e),
-        }
-    })
-    .await;
-
-    match result {
-        Ok(Ok((_, status))) if status.success() => Ok(()),
-        Ok(Ok((cmd, status))) => Err(t!(
-            "error_cmd_exit_code",
-            cmd = cmd,
-            code = status.code().unwrap_or(-1).to_string()
-        )
-        .to_string()),
-        Ok(Err(e)) => Err(t!("error_qdbus_start", error = e.to_string()).to_string()),
-        Err(e) => Err(t!("error_spawn_blocking", error = e.to_string()).to_string()),
-    }
+    let cmd = resolve_qdbus_path();
+    let args_ref: Vec<&str> = args.iter().map(String::as_str).collect();
+    run_command_blocking(cmd, &args_ref).await
 }
