@@ -28,6 +28,9 @@
 
 ---
 
+> [!WARNING]
+> **Disclaimer:** This is an unofficial, community-driven, open-source project. **"Asus Hub" is NOT affiliated with, endorsed by, sponsored by, or connected to ASUSTeK Computer Inc. in any way.** "ASUS", "Zenbook", "ROG", "Vivobook", and "MyAsus" are registered trademarks of ASUSTeK Computer Inc. This software is provided as-is, without warranty, and uses community reverse-engineered backend tools. Use at your own risk.
+
 ## Motivation
 
 ASUS provides the **MyAsus** application for Windows, offering a unified interface to control display settings, battery care, fan profiles, keyboard backlight, and more. On Linux, no equivalent exists.
