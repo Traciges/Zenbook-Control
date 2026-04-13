@@ -59,6 +59,19 @@ impl Component for OledCareModel {
             set_description: Some(&t!("oled_care_group_desc")),
 
             add = &gtk::Label {
+                #[watch]
+                set_visible: !model.kde_available,
+                set_label: &t!("kde_required_warning"),
+                add_css_class: "error",
+                set_wrap: true,
+                set_xalign: 0.0,
+                set_margin_top: 8,
+                set_margin_start: 12,
+                set_margin_end: 12,
+                set_margin_bottom: 4,
+            },
+
+            add = &gtk::Label {
                 set_label: &t!("oled_care_group_notice"),
                 add_css_class: "error",
                 set_wrap: true,

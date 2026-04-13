@@ -55,7 +55,7 @@ impl Component for TargetModeModel {
             add = &gtk::Label {
                 #[watch]
                 set_visible: !model.kde_available,
-                set_label: &t!("target_mode_kde_required"),
+                set_label: &t!("kde_required_warning"),
                 add_css_class: "error",
                 set_wrap: true,
                 set_xalign: 0.0,
