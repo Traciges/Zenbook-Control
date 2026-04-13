@@ -20,7 +20,7 @@ use relm4::prelude::*;
 use rust_i18n::t;
 
 use crate::components::display::helpers::run_qdbus;
-use crate::services::commands::run_command_blocking;
+use crate::services::commands::{is_gnome_desktop, is_kde_desktop, run_command_blocking};
 use crate::services::config::AppConfig;
 
 /// State for the touchpad enable/disable component.
@@ -33,6 +33,8 @@ pub struct TouchpadModel {
     confirmation_required: bool,
     /// Handle for the 10-second countdown task; abort it to cancel the revert.
     timer_handle: Option<tokio::task::JoinHandle<()>>,
+    /// Whether the current desktop environment supports touchpad toggling (KDE or GNOME).
+    desktop_supported: bool,
 }
 
 /// Input messages for the touchpad component.
@@ -67,6 +69,19 @@ impl Component for TouchpadModel {
         adw::PreferencesGroup {
             set_title: &t!("touchpad_group_title"),
 
+            add = &gtk::Label {
+                #[watch]
+                set_visible: !model.desktop_supported,
+                set_label: &t!("touchpad_desktop_required"),
+                add_css_class: "error",
+                set_wrap: true,
+                set_xalign: 0.0,
+                set_margin_top: 8,
+                set_margin_start: 12,
+                set_margin_end: 12,
+                set_margin_bottom: 4,
+            },
+
             add = &gtk::ListBox {
                 set_hexpand: true,
                 add_css_class: "boxed-list",
@@ -77,6 +92,8 @@ impl Component for TouchpadModel {
 
                     #[watch]
                     set_active: model.touchpad_active,
+                    #[watch]
+                    set_sensitive: model.desktop_supported,
 
                     connect_active_notify[sender] => move |s| {
                         sender.input(TouchpadMsg::ToggleTouchpad(s.is_active()));
@@ -115,6 +132,7 @@ impl Component for TouchpadModel {
             countdown: 10,
             confirmation_required: false,
             timer_handle: None,
+            desktop_supported: is_kde_desktop() || is_gnome_desktop(),
         };
         let widgets = view_output!();
         ComponentParts { model, widgets }

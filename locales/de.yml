@@ -145,6 +145,7 @@ touchpad_enable_subtitle: "Schaltet das Touchpad vollständig ein oder aus."
 touchpad_countdown_title: "Touchpad deaktiviert. Automatische Reaktivierung in %{seconds} Sekunden..."
 touchpad_confirm_label: "Einstellung bestätigen"
 error_touchpad_unsupported_desktop: "Desktop-Umgebung '%{desktop}' wird für Touchpad-Steuerung nicht unterstützt."
+touchpad_desktop_required: "Diese Funktion erfordert KDE Plasma oder GNOME."
 error_touchpad_kde: "KDE Touchpad-Toggle fehlgeschlagen. %{error}"
 
 # battery

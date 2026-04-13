@@ -101,3 +101,12 @@ pub(crate) fn is_kde_desktop() -> bool {
         .map(|v| v.to_uppercase().contains("KDE"))
         .unwrap_or(false)
 }
+
+/// Returns `true` if the current desktop session is GNOME.
+///
+/// Checks the `XDG_CURRENT_DESKTOP` environment variable for the substring `"GNOME"` (case-insensitive).
+pub(crate) fn is_gnome_desktop() -> bool {
+    std::env::var("XDG_CURRENT_DESKTOP")
+        .map(|v| v.to_uppercase().contains("GNOME"))
+        .unwrap_or(false)
+}
