@@ -36,17 +36,17 @@ lto = "thin"
 section = "utils"
 assets = [
     ["target/release/asus-hub", "usr/bin/asus-hub", "755"],
-    ["packaging/de.guido.asus-hub.desktop", "usr/share/applications/", "644"],
-    ["packaging/de.guido.asus-hub.metainfo.xml", "usr/share/metainfo/", "644"],
-    ["assets/trayicon.png", "usr/share/icons/hicolor/128x128/apps/de.guido.asus-hub.png", "644"],
+    ["packaging/io.github.traciges.asus-hub.desktop", "usr/share/applications/", "644"],
+    ["packaging/io.github.traciges.asus-hub.xml", "usr/share/metainfo/", "644"],
+    ["assets/trayicon.png", "usr/share/icons/hicolor/128x128/apps/io.github.traciges.asus-hub.png", "644"],
 ]
 
 [package.metadata.generate-rpm]
 assets = [
     { source = "target/release/asus-hub", dest = "/usr/bin/asus-hub", mode = "755" },
-    { source = "packaging/de.guido.asus-hub.desktop", dest = "/usr/share/applications/de.guido.asus-hub.desktop", mode = "644" },
-    { source = "packaging/de.guido.asus-hub.metainfo.xml", dest = "/usr/share/metainfo/de.guido.asus-hub.metainfo.xml", mode = "644" },
-    { source = "assets/trayicon.png", dest = "/usr/share/icons/hicolor/128x128/apps/de.guido.asus-hub.png", mode = "644" }
+    { source = "packaging/io.github.traciges.asus-hub.desktop", dest = "/usr/share/applications/io.github.traciges.asus-hub.desktop", mode = "644" },
+    { source = "packaging/io.github.traciges.asus-hub.xml", dest = "/usr/share/metainfo/io.github.traciges.asus-hub.xml", mode = "644" },
+    { source = "assets/trayicon.png", dest = "/usr/share/icons/hicolor/128x128/apps/io.github.traciges.asus-hub.png", mode = "644" }
 ]
 
 [package.metadata.appimage]

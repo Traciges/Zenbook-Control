@@ -17,7 +17,7 @@
 use directories::BaseDirs;
 use std::path::PathBuf;
 
-const DESKTOP_FILENAME: &str = "de.guido.asus-hub.desktop";
+const DESKTOP_FILENAME: &str = "io.github.traciges.asus-hub.desktop";
 
 fn autostart_path() -> Option<PathBuf> {
     BaseDirs::new().map(|d| d.config_dir().join("autostart").join(DESKTOP_FILENAME))

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <component type="desktop-application">
-  <id>de.guido.asus-hub</id>
+  <id>io.github.traciges.asus-hub</id>
   <name>Asus Hub</name>
   <summary>Unofficial Control Center for Asus Laptops</summary>
 
@@ -56,7 +56,7 @@
     </screenshot>
   </screenshots>
 
-  <launchable type="desktop-id">de.guido.asus-hub.desktop</launchable>
+  <launchable type="desktop-id">io.github.traciges.asus-hub.desktop</launchable>
 
   <url type="homepage">https://github.com/Traciges/Asus-Hub</url>
   <url type="bugtracker">https://github.com/Traciges/Asus-Hub/issues</url>
