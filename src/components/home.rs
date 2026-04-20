@@ -15,6 +15,7 @@
 // along with this program.  If not, see https://www.gnu.org/licenses/.
 
 use gtk4 as gtk;
+use gtk4::gdk;
 use gtk4::glib;
 use gtk4::prelude::*;
 use relm4::adw;
@@ -28,6 +29,12 @@ use std::sync::OnceLock;
 use crate::services::commands::pkexec_read_file;
 use crate::services::config::{AppConfig, Profile};
 use crate::sys_paths::*;
+
+const IMG_ZENBOOK: &[u8] = include_bytes!("../../assets/img/zenbook.png");
+const IMG_VIVOBOOK: &[u8] = include_bytes!("../../assets/img/vivobook.png");
+const IMG_TUF: &[u8] = include_bytes!("../../assets/img/tuf.png");
+const IMG_ROG: &[u8] = include_bytes!("../../assets/img/rog.png");
+const IMG_PROART: &[u8] = include_bytes!("../../assets/img/proart.png");
 
 static PROFILE_CSS: OnceLock<()> = OnceLock::new();
 
@@ -67,6 +74,7 @@ const PROFILE_ICONS: &[&str] = &[
 
 pub struct HomeModel {
     product_name_label: gtk::Label,
+    laptop_image: gtk::Picture,
     board_row: adw::ActionRow,
     bios_row: adw::ActionRow,
     kernel_row: adw::ActionRow,
@@ -436,11 +444,7 @@ impl Component for HomeModel {
                         set_orientation: gtk::Orientation::Horizontal,
                         set_spacing: 32,
 
-                        append = &gtk::Image {
-                            set_icon_name: Some("computer-symbolic"),
-                            set_pixel_size: 192,
-                            set_valign: gtk::Align::Center,
-                        },
+                        append = &model.laptop_image.clone(),
 
                         append = &adw::PreferencesGroup {
                             set_valign: gtk::Align::Center,
@@ -468,6 +472,25 @@ impl Component for HomeModel {
         let product_name_label = gtk::Label::new(Some(&t!("home_loading")));
         product_name_label.add_css_class("title-1");
         product_name_label.set_halign(gtk::Align::Start);
+
+        let laptop_image = gtk::Picture::new();
+        laptop_image.set_width_request(300);
+        laptop_image.set_height_request(200);
+        laptop_image.set_can_shrink(true);
+        laptop_image.set_content_fit(gtk::ContentFit::Contain);
+        laptop_image.set_valign(gtk::Align::Center);
+        if let Some(display) = gtk::gdk::Display::default() {
+            let theme = gtk::IconTheme::for_display(&display);
+            let icon = theme.lookup_icon(
+                "computer-symbolic",
+                &[],
+                192,
+                1,
+                gtk::TextDirection::None,
+                gtk::IconLookupFlags::empty(),
+            );
+            laptop_image.set_paintable(Some(&icon));
+        }
 
         let board_row = adw::ActionRow::new();
         board_row.set_title(&t!("home_board_title"));
@@ -552,6 +575,7 @@ impl Component for HomeModel {
 
         let model = HomeModel {
             product_name_label,
+            laptop_image,
             board_row,
             bios_row,
             kernel_row,
@@ -837,6 +861,28 @@ impl Component for HomeModel {
                 kernel,
             } => {
                 self.product_name_label.set_label(&product_name);
+
+                let name = product_name.to_lowercase();
+                let img_bytes: Option<&[u8]> = if name.contains("zenbook") {
+                    Some(IMG_ZENBOOK)
+                } else if name.contains("vivobook") {
+                    Some(IMG_VIVOBOOK)
+                } else if name.contains("tuf") {
+                    Some(IMG_TUF)
+                } else if name.contains("rog") {
+                    Some(IMG_ROG)
+                } else if name.contains("proart") {
+                    Some(IMG_PROART)
+                } else {
+                    None
+                };
+                if let Some(bytes) = img_bytes {
+                    let bytes = glib::Bytes::from_static(bytes);
+                    if let Ok(texture) = gdk::Texture::from_bytes(&bytes) {
+                        self.laptop_image.set_paintable(Some(&texture));
+                    }
+                }
+
                 self.board_row.set_subtitle(&board_name);
                 self.bios_row
                     .set_subtitle(&format!("{bios_version} / {bios_date}"));
