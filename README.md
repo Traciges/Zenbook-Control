@@ -1,7 +1,7 @@
 <h1 align="center">
-  <img src="assets/trayicon.png" alt="Asus Hub icon" width="128" height="128"/>
+  <img src="assets/trayicon.png" alt="Ayuz icon" width="128" height="128"/>
   <br>
-  Asus Hub
+  Ayuz
 </h1>
 
 <p align="center">
