@@ -1,4 +1,4 @@
-// Asus Hub - Unofficial Control Center for Asus Laptops
+// Ayuz - Unofficial Control Center for Asus Laptops
 // Copyright (C) 2026 Guido Philipp
 //
 // This program is free software: you can redistribute it and/or modify
@@ -17,7 +17,7 @@
 //! Helpers for ICC color profile management and KDE D-Bus utilities.
 //!
 //! ICC profiles are embedded in the binary at compile time and extracted to
-//! `~/.config/asus-hub/icm/` on first use. Profiles are applied via `kscreen-doctor`.
+//! `~/.config/ayuz/icm/` on first use. Profiles are applied via `kscreen-doctor`.
 
 use crate::services::commands::{resolve_qdbus_path, run_command_blocking};
 use crate::services::config::AppConfig;
@@ -26,11 +26,11 @@ use rust_i18n::t;
 /// `kscreen-doctor` output name for the built-in laptop display.
 pub(crate) const DISPLAY_NAME: &str = "eDP-1";
 
-const SRGB_ICM: &[u8] = include_bytes!("../../../assets/icm/ASUS_sRGB.icm");
-const DCIP3_ICM: &[u8] = include_bytes!("../../../assets/icm/ASUS_DCIP3.icm");
-const DISPLAYP3_ICM: &[u8] = include_bytes!("../../../assets/icm/ASUS_DisplayP3.icm");
+const SRGB_ICM: &[u8] = include_bytes!("../../../assets/icm/Ayuz_sRGB.icm");
+const DCIP3_ICM: &[u8] = include_bytes!("../../../assets/icm/Ayuz_DCIP3.icm");
+const DISPLAYP3_ICM: &[u8] = include_bytes!("../../../assets/icm/Ayuz_DisplayP3.icm");
 
-/// Extracts the bundled ICM files to `~/.config/asus-hub/icm/` and returns that directory path.
+/// Extracts the bundled ICM files to `~/.config/ayuz/icm/` and returns that directory path.
 ///
 /// Each file is only written if it does not already exist, making this safe to call on every
 /// startup without unnecessary disk writes.
@@ -45,9 +45,9 @@ pub(crate) async fn setup_icm_profiles() -> Result<std::path::PathBuf, String> {
             .map_err(|e| t!("error_icm_dir_create", error = e.to_string()).to_string())?;
 
         for (name, data) in [
-            ("ASUS_sRGB.icm", SRGB_ICM),
-            ("ASUS_DCIP3.icm", DCIP3_ICM),
-            ("ASUS_DisplayP3.icm", DISPLAYP3_ICM),
+            ("Ayuz_sRGB.icm", SRGB_ICM),
+            ("Ayuz_DCIP3.icm", DCIP3_ICM),
+            ("Ayuz_DisplayP3.icm", DISPLAYP3_ICM),
         ] {
             let path = base_clone.join(name);
             if !path.exists() {

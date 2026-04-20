@@ -1,4 +1,4 @@
-app_title: "Asus Hub"
+app_title: "Ayuz"
 search_placeholder: "Search settings..."
 search_no_results: "No results found"
 search_results_title: "Search Results"
@@ -91,8 +91,8 @@ target_mode_switch_subtitle: "Activates the KWin Dim Inactive compositor effect.
 target_mode_active_set: "Target Mode set to %{value}"
 
 # oled_care
-oled_care_group_title: "ASUS OLED Care"
-oled_care_group_desc: "ASUS OLED Care includes a set of optimization settings that's proven to protect your OLED display and maximize display lifespan."
+oled_care_group_title: "Ayuz OLED Care"
+oled_care_group_desc: "Ayuz OLED Care includes a set of optimization settings that's proven to protect your OLED display and maximize display lifespan."
 oled_care_group_notice: "Notice: Avoid displaying static images at maximum brightness for extended periods; otherwise, it might cause permanent burn-in damage to your OLED display."
 oled_care_pixel_refresh_title: "Pixel Refresh"
 oled_care_pixel_refresh_subtitle: "Launches a special screensaver after inactivity to evenly stress OLED pixels."
@@ -154,7 +154,7 @@ fn_key_save_error: "Error while saving: %{error}"
 # asus_key_hint
 asus_key_hint_group_title: "Launch via ASUS Key"
 asus_key_hint_row_title: "Launch via ASUS Key"
-asus_key_hint_row_subtitle: "For security and architecture reasons, Asus Hub does not listen to background keypresses. To open the app with your dedicated ASUS key, simply use the global shortcut settings of your Desktop Environment or Window Manager (e.g., KDE Custom Shortcuts, GNOME Settings, or your sxhkd/i3 config) and bind the key to launch 'asus-hub'."
+asus_key_hint_row_subtitle: "For security and architecture reasons, Ayuz does not listen to background keypresses. To open the app with your dedicated ASUS key, simply use the global shortcut settings of your Desktop Environment or Window Manager (e.g., KDE Custom Shortcuts, GNOME Settings, or your sxhkd/i3 config) and bind the key to launch 'ayuz'."
 
 # gestures
 gestures_group_title: "Smart Gestures"
@@ -235,8 +235,8 @@ gpu_mode_hybrid: "Hybrid"
 gpu_mode_integrated: "Integrated"
 gpu_mode_nvidia_no_modeset: "Nvidia (No Modeset)"
 gpu_mode_vfio: "VFIO"
-gpu_mode_asus_egpu: "ASUS eGPU"
-gpu_mode_asus_mux_discreet: "ASUS MUX Discrete"
+gpu_mode_asus_egpu: "Ayuz eGPU"
+gpu_mode_asus_mux_discreet: "Ayuz MUX Discrete"
 gpu_mode_set: "GPU mode changed to %{mode} - reboot to apply"
 error_gpu_mode_read: "Failed to read GPU mode: %{error}"
 error_gpu_mode_write: "Failed to set GPU mode: %{error}"

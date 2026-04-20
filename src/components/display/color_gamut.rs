@@ -1,4 +1,4 @@
-// Asus Hub - Unofficial Control Center for Asus Laptops
+// Ayuz - Unofficial Control Center for Asus Laptops
 // Copyright (C) 2026 Guido Philipp
 //
 // This program is free software: you can redistribute it and/or modify
@@ -27,9 +27,9 @@ use crate::services::{commands::is_kde_desktop, config::AppConfig};
 
 fn filename_for_index(index: u32) -> Option<&'static str> {
     match index {
-        1 => Some("ASUS_sRGB.icm"),
-        2 => Some("ASUS_DCIP3.icm"),
-        3 => Some("ASUS_DisplayP3.icm"),
+        1 => Some("Ayuz_sRGB.icm"),
+        2 => Some("Ayuz_DCIP3.icm"),
+        3 => Some("Ayuz_DisplayP3.icm"),
         _ => None,
     }
 }

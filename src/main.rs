@@ -1,4 +1,4 @@
-// Asus Hub - Unofficial Control Center for Asus Laptops
+// Ayuz - Unofficial Control Center for Asus Laptops
 // Copyright (C) 2026 Guido Philipp
 //
 // This program is free software: you can redistribute it and/or modify
@@ -55,8 +55,8 @@ fn main() {
     let start_hidden = args.iter().any(|arg| arg == "--hidden");
     let gtk_args: Vec<String> = args.into_iter().filter(|arg| arg != "--hidden").collect();
 
-    gtk4::glib::set_prgname(Some("de.guido.asus-hub"));
-    let a = relm4::RelmApp::new("de.guido.asus-hub").with_args(gtk_args);
+    gtk4::glib::set_prgname(Some("de.guido.ayuz"));
+    let a = relm4::RelmApp::new("de.guido.ayuz").with_args(gtk_args);
     load_css();
     relm4::adw::StyleManager::default().set_color_scheme(relm4::adw::ColorScheme::PreferDark);
     a.run::<app::AppModel>(start_hidden);

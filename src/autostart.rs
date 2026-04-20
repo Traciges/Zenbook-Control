@@ -1,4 +1,4 @@
-// Asus Hub - Unofficial Control Center for Asus Laptops
+// Ayuz - Unofficial Control Center for Asus Laptops
 // Copyright (C) 2026 Guido Philipp
 //
 // This program is free software: you can redistribute it and/or modify
@@ -17,7 +17,7 @@
 use directories::BaseDirs;
 use std::path::PathBuf;
 
-const DESKTOP_FILENAME: &str = "de.guido.asus-hub.desktop";
+const DESKTOP_FILENAME: &str = "de.guido.ayuz.desktop";
 
 fn autostart_path() -> Option<PathBuf> {
     BaseDirs::new().map(|d| d.config_dir().join("autostart").join(DESKTOP_FILENAME))
@@ -37,8 +37,8 @@ pub fn set_enabled(enable: bool) {
         }
         let content = "[Desktop Entry]\n\
             Type=Application\n\
-            Name=Asus Hub\n\
-            Exec=asus-hub --hidden\n\
+            Name=Ayuz\n\
+            Exec=ayuz --hidden\n\
             Hidden=false\n\
             StartupNotify=false\n\
             X-GNOME-Autostart-enabled=true\n";

@@ -1,4 +1,4 @@
-// Asus Hub - Unofficial Control Center for Asus Laptops
+// Ayuz - Unofficial Control Center for Asus Laptops
 // Copyright (C) 2026 Guido Philipp
 //
 // This program is free software: you can redistribute it and/or modify
@@ -104,7 +104,7 @@ pub struct AppModel {
     start_hidden: bool,
     window: gtk4::glib::WeakRef<adw::ApplicationWindow>,
     toast_overlay: adw::ToastOverlay,
-    _tray: ksni::Handle<tray::AsusTray>,
+    _tray: ksni::Handle<tray::AyuzTray>,
     home: Controller<HomeModel>,
     apu_mem: Controller<ApuMemModel>,
     battery: Controller<BatteryModel>,
@@ -247,7 +247,7 @@ impl SimpleComponent for AppModel {
         let sound_modes = launch_component!(SoundModesModel, sender);
         let volume_widget = launch_component!(VolumeModel, sender);
 
-        let tray_svc = ksni::TrayService::new(tray::AsusTray {
+        let tray_svc = ksni::TrayService::new(tray::AyuzTray {
             app_sender: sender.input_sender().clone(),
         });
         let tray_handle = tray_svc.handle();

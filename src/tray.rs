@@ -1,4 +1,4 @@
-// Asus Hub - Unofficial Control Center for Asus Laptops
+// Ayuz - Unofficial Control Center for Asus Laptops
 // Copyright (C) 2026 Guido Philipp
 //
 // This program is free software: you can redistribute it and/or modify
@@ -20,17 +20,17 @@ use ksni::{Icon, MenuItem, Tray};
 use relm4::Sender;
 use rust_i18n::t;
 
-pub struct AsusTray {
+pub struct AyuzTray {
     pub app_sender: Sender<AppMsg>,
 }
 
-impl Tray for AsusTray {
+impl Tray for AyuzTray {
     fn id(&self) -> String {
-        "AsusHub".into()
+        "Ayuz".into()
     }
 
     fn title(&self) -> String {
-        "Asus Hub".into()
+        "Ayuz".into()
     }
 
     fn icon_pixmap(&self) -> Vec<Icon> {

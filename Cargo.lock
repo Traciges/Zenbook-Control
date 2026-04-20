@@ -42,27 +42,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "asus-hub"
-version = "1.0.6"
-dependencies = [
- "directories",
- "evdev",
- "futures-util",
- "gtk4",
- "image",
- "ksni",
- "libadwaita",
- "relm4",
- "rust-i18n",
- "serde",
- "serde_json",
- "tokio",
- "tracing",
- "tracing-subscriber",
- "zbus",
-]
-
-[[package]]
 name = "async-broadcast"
 version = "0.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -112,6 +91,27 @@ name = "autocfg"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c08606f8c3cbf4ce6ec8e28fb0014a2c086708fe954eaa885384a6165172e7e8"
+
+[[package]]
+name = "ayuz"
+version = "1.0.6"
+dependencies = [
+ "directories",
+ "evdev",
+ "futures-util",
+ "gtk4",
+ "image",
+ "ksni",
+ "libadwaita",
+ "relm4",
+ "rust-i18n",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+ "zbus",
+]
 
 [[package]]
 name = "base62"

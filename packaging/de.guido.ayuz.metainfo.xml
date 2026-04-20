@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <component type="desktop-application">
-  <id>de.guido.asus-hub</id>
-  <name>Asus Hub</name>
+  <id>de.guido.ayuz</id>
+  <name>Ayuz</name>
   <summary>Unofficial Control Center for Asus Laptops</summary>
 
   <metadata_license>FSFAP</metadata_license>
@@ -12,7 +12,7 @@
 
   <description>
     <p>
-      Asus Hub is a lightweight, native Linux control center for Asus laptops (like Zenbook, Vivobook, and ROG).
+      Ayuz is a lightweight, native Linux control center for Asus laptops (like Zenbook, Vivobook, and ROG).
       It allows you to tweak deep hardware settings that are usually only available on Windows.
     </p>
     <p>
@@ -31,35 +31,35 @@
   <screenshots>
     <screenshot type="default">
       <image
-      >https://raw.githubusercontent.com/Traciges/Asus-Hub/refs/heads/main/screenshots/System.png</image>
+      >https://raw.githubusercontent.com/Traciges/Ayuz/refs/heads/main/screenshots/System.png</image>
       <caption>The system overview and battery settings</caption>
     </screenshot>
     <screenshot>
       <image
-      >https://raw.githubusercontent.com/Traciges/Asus-Hub/refs/heads/main/screenshots/Display.png</image>
+      >https://raw.githubusercontent.com/Traciges/Ayuz/refs/heads/main/screenshots/Display.png</image>
       <caption>Display and OLED care settings</caption>
     </screenshot>
     <screenshot>
       <image
-      >https://raw.githubusercontent.com/Traciges/Asus-Hub/refs/heads/main/screenshots/Keyboard.png</image>
+      >https://raw.githubusercontent.com/Traciges/Ayuz/refs/heads/main/screenshots/Keyboard.png</image>
       <caption>Keyboard backlight and gestures configuration</caption>
     </screenshot>
     <screenshot>
       <image
-      >https://raw.githubusercontent.com/Traciges/Asus-Hub/refs/heads/main/screenshots/Audio.png</image>
+      >https://raw.githubusercontent.com/Traciges/Ayuz/refs/heads/main/screenshots/Audio.png</image>
       <caption>Audio and volume mode control</caption>
     </screenshot>
     <screenshot>
       <image
-      >https://raw.githubusercontent.com/Traciges/Asus-Hub/refs/heads/main/screenshots/Touchpad.png</image>
+      >https://raw.githubusercontent.com/Traciges/Ayuz/refs/heads/main/screenshots/Touchpad.png</image>
       <caption>Touchpad and gesture settings</caption>
     </screenshot>
   </screenshots>
 
-  <launchable type="desktop-id">de.guido.traciges.asus-hub.desktop</launchable>
+  <launchable type="desktop-id">de.guido.ayuz.desktop</launchable>
 
-  <url type="homepage">https://github.com/Traciges/Asus-Hub</url>
-  <url type="bugtracker">https://github.com/Traciges/Asus-Hub/issues</url>
+  <url type="homepage">https://github.com/Traciges/Ayuz</url>
+  <url type="bugtracker">https://github.com/Traciges/Ayuz/issues</url>
 
   <content_rating type="oars-1.1" />
 
@@ -76,7 +76,7 @@
     </release>
     <release version="1.0.0" date="2026-04-07">
       <description>
-        <p>Initial release of Asus Hub for Linux.</p>
+        <p>Initial release of Ayuz for Linux.</p>
       </description>
     </release>
   </releases>

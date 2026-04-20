@@ -1,4 +1,4 @@
-// Asus Hub - Unofficial Control Center for Asus Laptops
+// Ayuz - Unofficial Control Center for Asus Laptops
 // Copyright (C) 2026 Guido Philipp
 //
 // This program is free software: you can redistribute it and/or modify
@@ -179,9 +179,9 @@ pub enum GfxMode {
     NvidiaNoModeset = 2,
     /// dGPU passed through to a virtual machine via VFIO (value `3`).
     Vfio = 3,
-    /// ASUS external GPU dock mode (value `4`).
+    /// Ayuz external GPU dock mode (value `4`).
     AsusEgpu = 4,
-    /// ASUS MUX switch set to discrete-only output (value `5`).
+    /// Ayuz MUX switch set to discrete-only output (value `5`).
     AsusMuxDiscreet = 5,
 }
 

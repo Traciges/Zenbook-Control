@@ -1,4 +1,4 @@
-// Asus Hub - Unofficial Control Center for Asus Laptops
+// Ayuz - Unofficial Control Center for Asus Laptops
 // Copyright (C) 2026 Guido Philipp
 //
 // This program is free software: you can redistribute it and/or modify
@@ -123,7 +123,7 @@ impl Default for Profile {
     }
 }
 
-/// Persistent application configuration stored as JSON at `~/.config/asus-hub/config.json`.
+/// Persistent application configuration stored as JSON at `~/.config/ayuz/config.json`.
 #[derive(Serialize, Deserialize, Clone)]
 pub struct AppConfig {
     // ── Global (non-profile) settings ────────────────────────────────────────
@@ -219,7 +219,7 @@ impl Default for AppConfig {
 
 impl AppConfig {
     pub fn config_dir() -> Option<std::path::PathBuf> {
-        ProjectDirs::from("", "", "asus-hub").map(|dirs| dirs.config_dir().to_path_buf())
+        ProjectDirs::from("", "", "ayuz").map(|dirs| dirs.config_dir().to_path_buf())
     }
 
     fn config_path() -> Option<std::path::PathBuf> {

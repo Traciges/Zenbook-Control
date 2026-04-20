@@ -1,10 +1,11 @@
 [Desktop Entry]
 Version=1.0
 Type=Application
-Name=Asus Hub
+Name=Ayuz
 Comment=Unofficial Control Center for Asus Laptops
-Exec=asus-hub
-Icon=de.guido.asus-hub
+Exec=ayuz
+Icon=ayuz
 Terminal=false
 StartupNotify=true
+StartupWMClass=de.guido.ayuz
 Categories=Settings;HardwareSettings;System;

@@ -1,9 +1,9 @@
 [package]
-name = "asus-hub"
+name = "ayuz"
 version = "1.0.6"
 edition = "2024"
 license = "GPL-3.0-or-later"
-repository = "https://github.com/Traciges/Asus-Hub"
+repository = "https://github.com/Traciges/Ayuz"
 description = "Unofficial MyAsus Clone for Asus Laptops"
 authors = ["Guido Philipp"]
 
@@ -32,18 +32,18 @@ lto = "thin"
 [package.metadata.deb]
 section = "utils"
 assets = [
-    ["target/release/asus-hub", "usr/bin/asus-hub", "755"],
-    ["packaging/de.guido.asus-hub.desktop", "usr/share/applications/", "644"],
-    ["packaging/de.guido.asus-hub.metainfo.xml", "usr/share/metainfo/", "644"],
-    ["assets/trayicon.png", "usr/share/icons/hicolor/128x128/apps/de.guido.asus-hub.png", "644"],
+    ["target/release/ayuz", "usr/bin/ayuz", "755"],
+    ["packaging/de.guido.ayuz.desktop", "usr/share/applications/", "644"],
+    ["packaging/de.guido.ayuz.metainfo.xml", "usr/share/metainfo/", "644"],
+    ["assets/trayicon.png", "usr/share/icons/hicolor/128x128/apps/de.guido.ayuz.png", "644"],
 ]
 
 [package.metadata.generate-rpm]
 assets = [
-    { source = "target/release/asus-hub", dest = "/usr/bin/asus-hub", mode = "755" },
-    { source = "packaging/de.guido.asus-hub.desktop", dest = "/usr/share/applications/de.guido.asus-hub.desktop", mode = "644" },
-    { source = "packaging/de.guido.asus-hub.metainfo.xml", dest = "/usr/share/metainfo/de.guido.asus-hub.metainfo.xml", mode = "644" },
-    { source = "assets/trayicon.png", dest = "/usr/share/icons/hicolor/128x128/apps/de.guido.asus-hub.png", mode = "644" }
+    { source = "target/release/ayuz", dest = "/usr/bin/ayuz", mode = "755" },
+    { source = "packaging/de.guido.ayuz.desktop", dest = "/usr/share/applications/de.guido.ayuz.desktop", mode = "644" },
+    { source = "packaging/de.guido.ayuz.metainfo.xml", dest = "/usr/share/metainfo/de.guido.ayuz.metainfo.xml", mode = "644" },
+    { source = "assets/trayicon.png", dest = "/usr/share/icons/hicolor/128x128/apps/de.guido.ayuz.png", mode = "644" }
 ]
 
 [package.metadata.appimage]
@@ -56,5 +56,5 @@ auto_link_exclude_list = [
     "libgcc_s.so*",
 ]
 icon = "assets/trayicon.png"
-desktop_entry = "packaging/asus-hub-appimage.desktop"
+desktop_entry = "packaging/ayuz-appimage.desktop"
 assets = ["packaging/appimage/usr"]
