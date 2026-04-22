@@ -177,10 +177,37 @@
               default = false;
               description = "Start Ayuz minimized on login.";
             };
+            settings = lib.mkOption {
+              type =
+                with lib.types;
+                nullOr (
+                  either str (submodule {
+                    freeformType = (pkgs.formats.json { }).type;
+                  })
+                );
+              default = null;
+              description = ''
+                Configuration written to <filename>~/.config/ayuz/config.json</filename>.
+                Accepts either a Nix attribute set or a raw JSON string.
+                See the application for available options.
+                If set to <literal>null</literal> (default), the configuration is not managed by Nix.
+              '';
+            };
           };
 
           config = lib.mkIf cfg.enable {
             home.packages = [ ayuz-pkg ];
+
+            xdg.configFile."ayuz/config.json" = lib.mkIf (cfg.settings != null) (
+              if lib.isString cfg.settings then
+                {
+                  text = cfg.settings;
+                }
+              else
+                {
+                  source = (pkgs.formats.json { }).generate "ayuz-config" cfg.settings;
+                }
+            );
 
             systemd.user.services.ayuz = lib.mkIf cfg.autostart {
               Unit = {

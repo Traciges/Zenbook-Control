@@ -238,12 +238,16 @@ Add `ayuz` to your `flake.nix` inputs: `ayuz.url = "github:Klbgr/Ayuz";`.
     services.ayuz.supportMyAsusKey = true; # Optional: Rebind MyAsus/ROG key to launch Ayuz
   }
   ```
-- **Home Manager Module:** For per-user installation and optional autostart.
+- **Home Manager Module:** For per-user installation, optional autostart, and configuration.
   ```nix
   { inputs, ... }: {
     imports = [ inputs.ayuz.homeManagerModules.default ];
     programs.ayuz.enable = true;
     programs.ayuz.autostart = true; # Start minimized on login
+    programs.ayuz.settings = {
+      # accepts either a Nix attribute set or a raw JSON string
+      language = "en";
+    };
   }
   ```
 - **Traditional (Flakeless) usage:** You can use `builtins.getFlake` to use the modules or package directly.
