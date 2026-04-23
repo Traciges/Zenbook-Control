@@ -195,7 +195,7 @@ async fn fetch_metrics() -> HomeCommandOutput {
             })
             .unwrap_or_else(|_| "?°C".to_string());
 
-        format!("{} | {}", load, temp)
+        format!("{}% | {}", load, temp)
     };
 
     let ram = tokio::fs::read_to_string(SYS_MEM_INFO)
