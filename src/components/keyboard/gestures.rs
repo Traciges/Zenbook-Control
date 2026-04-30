@@ -28,12 +28,20 @@ use crate::services::edge_gestures;
 pub struct GesturesModel {
     active: bool,
     loop_tx: Option<watch::Sender<bool>>,
+    brightnessctl_available: bool,
+    playerctl_available: bool,
 }
 
 #[derive(Debug)]
 pub enum GesturesMsg {
     ToggleGestures(bool),
     LoadProfile(bool),
+}
+
+#[derive(Debug)]
+pub enum GesturesCommandOutput {
+    BrightnessctlChecked(bool),
+    PlayerctlChecked(bool),
 }
 
 const GESTURE_IMG: &[u8] = include_bytes!("../../../assets/img/gesture.png");
@@ -43,12 +51,25 @@ impl Component for GesturesModel {
     type Init = ();
     type Input = GesturesMsg;
     type Output = String;
-    type CommandOutput = ();
+    type CommandOutput = GesturesCommandOutput;
 
     view! {
         adw::PreferencesGroup {
             set_title: &t!("gestures_group_title"),
             set_description: Some(&t!("gestures_group_desc")),
+
+            add = &gtk::Label {
+                #[watch]
+                set_visible: !model.brightnessctl_available || !model.playerctl_available,
+                set_label: &t!("gestures_deps_missing_warning"),
+                add_css_class: "error",
+                set_wrap: true,
+                set_xalign: 0.0,
+                set_margin_top: 8,
+                set_margin_start: 12,
+                set_margin_end: 12,
+                set_margin_bottom: 4,
+            },
 
             add = &gtk::Box {
                 set_orientation: gtk::Orientation::Horizontal,
@@ -70,6 +91,9 @@ impl Component for GesturesModel {
 
                         #[watch]
                         set_active: model.active,
+
+                        #[watch]
+                        set_sensitive: model.brightnessctl_available && model.playerctl_available,
 
                         connect_active_notify[sender] => move |s| {
                             sender.input(GesturesMsg::ToggleGestures(s.is_active()));
@@ -106,8 +130,47 @@ impl Component for GesturesModel {
         } else {
             None
         };
-        let model = GesturesModel { active, loop_tx };
+        let model = GesturesModel {
+            active,
+            loop_tx,
+            brightnessctl_available: false,
+            playerctl_available: false,
+        };
         let widgets = view_output!();
+
+        sender.command(|out, shutdown| {
+            shutdown
+                .register(async move {
+                    let ok = tokio::task::spawn_blocking(|| {
+                        std::process::Command::new("which")
+                            .arg("brightnessctl")
+                            .status()
+                            .map(|s| s.success())
+                            .unwrap_or(false)
+                    })
+                    .await
+                    .unwrap_or(false);
+                    out.send(GesturesCommandOutput::BrightnessctlChecked(ok)).ok();
+                })
+                .drop_on_shutdown()
+        });
+
+        sender.command(|out, shutdown| {
+            shutdown
+                .register(async move {
+                    let ok = tokio::task::spawn_blocking(|| {
+                        std::process::Command::new("which")
+                            .arg("playerctl")
+                            .status()
+                            .map(|s| s.success())
+                            .unwrap_or(false)
+                    })
+                    .await
+                    .unwrap_or(false);
+                    out.send(GesturesCommandOutput::PlayerctlChecked(ok)).ok();
+                })
+                .drop_on_shutdown()
+        });
 
         let bytes = glib::Bytes::from_static(GESTURE_IMG);
         if let Ok(texture) = gdk::Texture::from_bytes(&bytes) {
@@ -140,6 +203,18 @@ impl Component for GesturesModel {
                     self.loop_tx = None;
                 }
             }
+        }
+    }
+
+    fn update_cmd(
+        &mut self,
+        msg: GesturesCommandOutput,
+        _sender: ComponentSender<Self>,
+        _root: &Self::Root,
+    ) {
+        match msg {
+            GesturesCommandOutput::BrightnessctlChecked(ok) => self.brightnessctl_available = ok,
+            GesturesCommandOutput::PlayerctlChecked(ok) => self.playerctl_available = ok,
         }
     }
 }

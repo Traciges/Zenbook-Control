@@ -166,6 +166,7 @@ gestures_brightness_title: "Adjust Brightness"
 gestures_brightness_subtitle: "Swipe fingers up or down on the right edge."
 gestures_media_title: "Skip Forward/Backward"
 gestures_media_subtitle: "Swipe fingers left or right on the top edge."
+gestures_deps_missing_warning: "brightnessctl and/or playerctl are not installed. Brightness and media gestures are unavailable."
 
 # touchpad
 touchpad_group_title: "Touchpad"

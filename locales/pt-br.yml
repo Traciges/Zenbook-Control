@@ -166,6 +166,7 @@ gestures_brightness_title: "Ajustar brilho"
 gestures_brightness_subtitle: "Deslize para cima ou para baixo na borda direita."
 gestures_media_title: "Avançar/retroceder mídia"
 gestures_media_subtitle: "Deslize para os lados na borda superior."
+gestures_deps_missing_warning: "brightnessctl e/ou playerctl não estão instalados. Os gestos de brilho e mídia estão indisponíveis."
 
 # touchpad
 touchpad_group_title: "Touchpad"

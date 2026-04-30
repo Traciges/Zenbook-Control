@@ -166,6 +166,7 @@ gestures_brightness_title: "Helligkeit einstellen"
 gestures_brightness_subtitle: "Wischen Sie mit Fingern am rechten Rand nach oben oder unten."
 gestures_media_title: "Vor-/Zurückspulen"
 gestures_media_subtitle: "Wischen Sie mit Fingern am oberen Rand nach links oder rechts."
+gestures_deps_missing_warning: "brightnessctl und/oder playerctl sind nicht installiert. Helligkeits- und Mediengesten sind nicht verfügbar."
 
 # touchpad
 touchpad_group_title: "Touchpad"
