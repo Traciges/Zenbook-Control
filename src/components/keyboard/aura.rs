@@ -170,7 +170,7 @@ impl Component for AuraModel {
         });
 
         // Colour button
-        let colour_button = gtk::ColorDialogButton::new(Some(&gtk::ColorDialog::new()));
+        let colour_button = gtk::ColorDialogButton::new(Some(gtk::ColorDialog::new()));
         let initial_rgba = RGBA::new(
             saved_colour.r as f32 / 255.0,
             saved_colour.g as f32 / 255.0,
