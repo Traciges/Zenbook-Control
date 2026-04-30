@@ -72,6 +72,7 @@ enum AppPage {
     Home,
     Display,
     Keyboard,
+    Aura,
     Touchpad,
     Audio,
     System,
@@ -84,6 +85,7 @@ impl AppPage {
             AppPage::Home => "home",
             AppPage::Display => "display",
             AppPage::Keyboard => "keyboard",
+            AppPage::Aura => "aura",
             AppPage::Touchpad => "touchpad",
             AppPage::Audio => "audio",
             AppPage::System => "system",
@@ -359,8 +361,10 @@ impl SimpleComponent for AppModel {
         display_page.add(oled_care_widget);
         display_page.add(color_gamut_widget);
 
+        let aura_page = adw::PreferencesPage::new();
+        aura_page.add(aura_widget);
+
         let keyboard_page = adw::PreferencesPage::new();
-        keyboard_page.add(aura_widget);
         keyboard_page.add(auto_backlight_widget);
         keyboard_page.add(backlight_idle_widget);
         keyboard_page.add(fn_key_widget);
@@ -518,6 +522,7 @@ impl SimpleComponent for AppModel {
         content_stack.add_named(&home_scroll, Some(AppPage::Home.as_str()));
         content_stack.add_named(&display_page, Some(AppPage::Display.as_str()));
         content_stack.add_named(&keyboard_page, Some(AppPage::Keyboard.as_str()));
+        content_stack.add_named(&aura_page, Some(AppPage::Aura.as_str()));
         content_stack.add_named(&touchpad_page, Some(AppPage::Touchpad.as_str()));
         content_stack.add_named(&audio_page, Some(AppPage::Audio.as_str()));
         content_stack.add_named(&system_page, Some(AppPage::System.as_str()));
