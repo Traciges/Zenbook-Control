@@ -191,7 +191,7 @@ yay -S asus-hub
 <br>
 
 **NixOS (Flakes)** <br>
-Add `ayuz` to your `flake.nix` inputs: `ayuz.url = "github:Klbgr/Ayuz";`.
+Add `ayuz` to your `flake.nix` inputs: `ayuz.url = "github:Traciges/Ayuz";`.
 
 - **NixOS Module (Recommended):** Automatically configures required system services (`asusd`, `supergfxd`), udev rules, and polkit policies.
   ```nix
@@ -218,7 +218,7 @@ Add `ayuz` to your `flake.nix` inputs: `ayuz.url = "github:Klbgr/Ayuz";`.
   ```nix
   { pkgs, ... }: 
   let
-    ayuz-flake = builtins.getFlake "github:Klbgr/Ayuz";
+    ayuz-flake = builtins.getFlake "github:Traciges/Ayuz";
   in {
     imports = [ ayuz-flake.nixosModules.default ];
     services.ayuz = { ... };
