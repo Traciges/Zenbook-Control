@@ -16,8 +16,8 @@
 
 > [!WARNING]
 > **Disclaimer:** This is an unofficial, community-driven, open-source project. **"Ayuz" is NOT affiliated with, endorsed by, sponsored by, or connected to ASUSTeK Computer Inc. in any way.** "ASUS", "Zenbook", "ROG", "Vivobook", and "MyAsus" are registered trademarks of ASUSTeK Computer Inc. <br>
-The use of ASUS trademarks within this website and associated tools and libraries is only to provide a recognisable identifier to users to enable them to associate that these tools will work with ASUS laptops. <br>
-This software is provided as-is, without warranty, and uses community reverse-engineered backend tools. Use at your own risk.
+> The use of ASUS trademarks within this website and associated tools and libraries is only to provide a recognisable identifier to users to enable them to associate that these tools will work with ASUS laptops. <br>
+> This software is provided as-is, without warranty, and uses community reverse-engineered backend tools. Use at your own risk.
 
 ---
 
@@ -26,15 +26,18 @@ This software is provided as-is, without warranty, and uses community reverse-en
 <table align="center">
   <tr>
     <td align="center"><img src="screenshots/Homepage.png" alt="Homepage" width="100%"/><br/><em>Homepage</em></td>
-    <td align="center"><img src="screenshots/Display.png" alt="Display settings" width="100%"/><br/><em>Display Settings</em></td>
+    <td align="center"><img src="screenshots/Audio.png" alt="Audio settings" width="100%"/><br/><em>Audio Settings</em></td>
   </tr>
   <tr>
-  <td align="center"><img src="screenshots/Keyboard.png" alt="Keyboard settings" width="100%"/><br/><em>Keyboard Settings</em></td>
-  <td align="center"><img src="screenshots/Audio.png" alt="Audio settings" width="100%"/><br/><em>Audio Settings</em></td>
+  <td align="center"><img src="screenshots/Aura.png" alt="Aura settings" width="100%"/><br/><em>Aura Settings</em></td>
+  <td align="center"><img src="screenshots/Display.png" alt="Display settings" width="100%"/><br/><em>Display Settings</em></td>
 </tr>
 <tr>
-  <td align="center"><img src="screenshots/Touchpad.png" alt="Touchpad settings" width="100%"/><br/><em>Touchpad Settings</em></td>
-    <td align="center" colspan="2"><img src="screenshots/System.png" alt="System settings" width="100%"/><br/><em>System Settings</em></td>
+  <td align="center"><img src="screenshots/Keyboard.png" alt="Keyboard settings" width="100%"/><br/><em>Keyboard Settings</em></td>
+    <td align="center"><img src="screenshots/System.png" alt="System settings" width="100%"/><br/><em>System Settings</em></td>
+</tr>
+<tr>
+  <td align="center" colspan="2"><img src="screenshots/Touchpad.png" alt="Touchpad settings" width="100%"/><br/><em>Touchpad Settings</em></td>
 </tr>
 </table>
 
@@ -50,9 +53,10 @@ Instead, the relevant controls are scattered across a variety of independent too
 - Display brightness quirks via `kscreen-doctor`
 - Fan profiles via D-Bus calls to `asusd`
 - Keyboard backlight via idle daemons like `swayidle`
+- Aura RGB lighting via raw D-Bus calls to `asusd`
 - OLED-specific care settings buried in KDE power management config files
 
-Asus Hub aims to consolidate all of these into a single, clean GTK4 interface - making it easy to manage your ASUS laptop on Linux without needing to know which tool controls which feature. <br>
+Ayuz aims to consolidate all of these into a single, clean GTK4 interface - making it easy to manage your ASUS laptop on Linux without needing to know which tool controls which feature. <br>
 The application is smart about availability: if a required tool or desktop environment is not detected, the corresponding setting is automatically disabled rather than silently failing.
 
 ---
@@ -81,12 +85,22 @@ The application is smart about availability: if a required tool or desktop envir
 | Backlight Idle Mode | Turns off backlight after inactivity (1/2/5 min), configurable per power state | `swayidle`         |
 | FN Key Mode         | Toggle between function key priority (F1-F12) and shortcut priority            | `asusd`            |
 
+### Aura RGB
+
+| Feature           | Description                                                                                                                   | Requires |
+| ----------------- | ----------------------------------------------------------------------------------------------------------------------------- | -------- |
+| Lighting Mode     | Choose from 12 modes: Static, Breathe, Rainbow Cycle, Rainbow Wave, Star, Rain, Highlight, Laser, Ripple, Pulse, Comet, Flash | `asusd`  |
+| Color Control     | Set primary and secondary colors (RGB) — secondary color available for Breathe and Star modes                                 | `asusd`  |
+| Brightness        | Four brightness levels: Off, Low, Medium, High                                                                                | `asusd`  |
+| Speed & Direction | Control animation speed (Low/Medium/High) and direction (Rainbow Wave only)                                                   | `asusd`  |
+| Power Settings    | Configure LED behavior per zone for Boot, Awake, Sleep, and Shutdown states                                                   | `asusd`  |
+
 ### Touchpad
 
-| Feature         | Description                                                               | Requires                      |
-| --------------- | ------------------------------------------------------------------------- | ----------------------------- |
-| Smart Gestures  | Control volume, brightness, and media playback via touchpad edge swipes   | `brightnessctl`, `playerctl`  |
-| Touchpad Toggle | Enable or disable the touchpad, with a 10-second auto-revert safety timer | KDE or GNOME                  |
+| Feature         | Description                                                               | Requires                     |
+| --------------- | ------------------------------------------------------------------------- | ---------------------------- |
+| Smart Gestures  | Control volume, brightness, and media playback via touchpad edge swipes   | `brightnessctl`, `playerctl` |
+| Touchpad Toggle | Enable or disable the touchpad, with a 10-second auto-revert safety timer | KDE or GNOME                 |
 
 ### Audio
 
@@ -123,7 +137,7 @@ The application is smart about availability: if a required tool or desktop envir
 
 ## Dependencies
 
-Asus Hub integrates with several external tools and system services. Install only the ones relevant to the features you want to use.
+Ayuz integrates with several external tools and system services. Install only the ones relevant to the features you want to use.
 
 | Dependency                                                 | Purpose                                                          | Package (Fedora)              |
 | ---------------------------------------------------------- | ---------------------------------------------------------------- | ----------------------------- |
@@ -163,8 +177,8 @@ Other Linux distributions should work as long as the relevant dependencies can b
 ### Package Managers:
 
 **Fedora (Copr - Community Maintained)** <br>
-A community member has packaged Asus Hub for Fedora via Copr, providing automatic rebuilds and updates. <br>
-**Note:** This repository is maintained by the community [SkyR0ver](https://github.com/SkyR0ver/asus-hub-rpm), not officially by the upstream project. Currently supported on Fedora 43+.
+A community member has packaged Ayuz for Fedora via Copr, providing automatic rebuilds and updates. <br>
+**Note:** This repository is maintained by the community [SkyR0ver](https://github.com/SkyR0ver/ayuz-rpm), not officially by the upstream project. Currently supported on Fedora 43+.
 
 ```bash
 sudo dnf copr enable lukenukem/asus-linux
@@ -216,7 +230,7 @@ Add `ayuz` to your `flake.nix` inputs: `ayuz.url = "github:Traciges/Ayuz";`.
   ```
 - **Traditional (Flakeless) usage:** You can use `builtins.getFlake` to use the modules or package directly.
   ```nix
-  { pkgs, ... }: 
+  { pkgs, ... }:
   let
     ayuz-flake = builtins.getFlake "github:Traciges/Ayuz";
   in {
@@ -228,10 +242,11 @@ Add `ayuz` to your `flake.nix` inputs: `ayuz.url = "github:Traciges/Ayuz";`.
     };
   }
   ```
-  
+
 ### Install from GitHub Releases:
 
 ### 1. Prerequisites
+
 **Note:** If you plan to use the AppImage (see Step 5), you can skip this step entirely. The AppImage already bundles all the necessary UI dependencies.
 
 - Rust toolchain (install via [rustup](https://rustup.rs))
