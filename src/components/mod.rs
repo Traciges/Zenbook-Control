@@ -20,3 +20,4 @@ pub mod display;
 pub mod home;
 pub mod keyboard;
 pub mod system;
+pub mod touchpad;
