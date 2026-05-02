@@ -38,7 +38,7 @@ assets = [
     ["assets/trayicon.png", "usr/share/icons/hicolor/128x128/apps/de.guido.ayuz.png", "644"],
 ]
 
-[package.metadata.rpm]
+[package.metadata.generate-rpm]
 assets = [
     { source = "target/release/ayuz", dest = "/usr/bin/ayuz", mode = "755" },
     { source = "packaging/de.guido.ayuz.desktop", dest = "/usr/share/applications/de.guido.ayuz.desktop", mode = "644" },

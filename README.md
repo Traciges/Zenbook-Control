@@ -341,7 +341,7 @@ cargo build --release
 
 ```bash
 cargo install cargo-rpm
-cargo rpm build
+cargo generate-rpm
 ```
 
 ### Build a DEB
