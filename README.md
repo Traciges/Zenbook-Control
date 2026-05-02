@@ -28,7 +28,7 @@
     <td align="center" colspan="2"><img src="screenshots/Homepage.png" alt="Homepage" width="100%"/><br/><em>Homepage</em></td>
   </tr>
   <tr>
-    <td align="center"><img src="screenshots/Audio.png" alt="Audio" width="100%"/><br/><em>Audio</em></td>
+    <td align="center"><img src="screenshots/Audio.png" alt="Audio settings" width="100%"/><br/><em>Audio Settings</em></td>
     <td align="center"><img src="screenshots/Aura.png" alt="Aura settings" width="100%"/><br/><em>Aura Settings</em></td>
   </tr>
   <tr>
