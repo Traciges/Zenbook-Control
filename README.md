@@ -192,14 +192,14 @@ sudo systemctl enable --now supergfxd.service
 **Arch Linux (AUR)** <br>
 The application is available in the Arch User Repository. Install using your preferred AUR helper:
 
-| Package        | Description                                              |
-| -------------- | -------------------------------------------------------- |
-| `asus-hub`     | Compiles the latest stable release from source           |
-| `asus-hub-bin` | Downloads and installs the pre-compiled binary (fastest) |
-| `asus-hub-git` | Compiles the latest commit from the main branch          |
+| Package    | Description                                              |
+| ---------- | -------------------------------------------------------- |
+| `ayuz`     | Compiles the latest stable release from source           |
+| `ayuz-bin` | Downloads and installs the pre-compiled binary (fastest) |
+| `ayuz-git` | Compiles the latest commit from the main branch          |
 
 ```bash
-yay -S asus-hub
+yay -S ayuz
 ```
 
 <br>
