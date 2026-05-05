@@ -95,6 +95,21 @@ The application is smart about availability: if a required tool or desktop envir
 | Speed & Direction | Control animation speed (Low/Medium/High) and direction (Rainbow Wave only)                                                   | `asusd`  |
 | Power Settings    | Configure LED behavior per zone for Boot, Awake, Sleep, and Shutdown states                                                   | `asusd`  |
 
+### AniMatrix LED Panel
+
+Controls for the AniMatrix LED matrix display found on select ROG laptops (e.g. ROG Zephyrus G14 GA401). The section is always visible but grayed out on unsupported hardware.
+
+| Feature                  | Description                                                                                                      | Requires |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------------- | -------- |
+| Enable / Disable         | Turn the AniMatrix panel on or off                                                                               | `asusd`  |
+| Brightness               | Four brightness levels: Off, Low, Medium, High                                                                   | `asusd`  |
+| Built-in Animations      | Enable or disable firmware-driven animations and select which animation plays during Boot, Awake, Sleep, Shutdown | `asusd`  |
+| Power Behavior           | Automatically turn off the panel when unplugged, suspended, or when the lid is closed                            | `asusd`  |
+| GIF Gallery              | Stream one of 34 bundled ASUS animations directly to the panel; play/stop with a single button                   | `asusd`  |
+| Profile Integration      | All AniMatrix settings are saved per profile and restored on profile switch                                       | `asusd`  |
+
+> **GIF Gallery availability:** The gallery currently supports **GA401** hardware (ROG G14 2021), where the bundled ASUS GIF format (74×36 px) matches the panel exactly. GIF playback on other AniMatrix models (GA402, GU604, G635L, G835L) is planned for a future release once multi-device frame sizing is available. Firmware controls (brightness, built-in animations, power behavior) work on all supported models.
+
 ### Touchpad
 
 | Feature         | Description                                                               | Requires                     |
@@ -130,7 +145,7 @@ The application is smart about availability: if a required tool or desktop envir
 - **System tray** - minimize to tray, restore or quit from tray menu
 - **Autostart** - optional autostart with the system; when enabled, the app launches hidden (`--hidden`) and only appears in the tray. Managed via a `.desktop` file at `~/.config/autostart/de.guido.ayuz.desktop`
 - **Persistent configuration** - settings are saved to `~/.config/ayuz/config.json` and restored on every launch
-- **Multilingual UI** - English and German supported, switchable at runtime
+- **Multilingual UI** - English, German, and Brazilian Portuguese supported, switchable at runtime
 - **Toast notifications** - errors and status messages shown as non-blocking toasts
 
 ---
@@ -169,6 +184,18 @@ The application has been developed and tested on:
 
 Other ASUS laptops are likely supported to varying degrees. Features relying on `asusd` (battery, fan, FN key) depend on your device being supported by asusctl. Check the [asusctl device support list](https://gitlab.com/asus-linux/asusctl) for compatibility. <br>
 Other Linux distributions should work as long as the relevant dependencies can be installed. Features are individually guarded against missing tools, so the app remains usable even if only some dependencies are available.
+
+**AniMatrix models:** The AniMatrix LED panel section is supported on the following hardware, detected automatically via DMI board name:
+
+| Model identifier | Device |
+| ---------------- | ------ |
+| `GA401I`, `GA401Q` | ROG Zephyrus G14 (2021) |
+| `GA402R`, `GA402X`, `GA402N` | ROG Zephyrus G14 (2022) |
+| `GU604V` | ROG Zephyrus Duo 16 |
+| `G635L` | ROG Strix G16 |
+| `G835L` | ROG Strix SCAR 16 |
+
+On all other models the AniMatrix section is shown as grayed out.
 
 ---
 
@@ -294,19 +321,19 @@ Download the package matching your distribution from the [GitHub Releases](https
 - **Fedora / RPM-based:**
 
   ```bash
-  sudo dnf install ./ayuz-1.0.9-1.x86_64.rpm
+  sudo dnf install ./ayuz-1.1.0-1.x86_64.rpm
   ```
 
 - **Debian / Ubuntu / DEB-based:**
 
   ```bash
-  sudo apt install ./ayuz_1.0.9-1_amd64.deb
+  sudo apt install ./ayuz_1.1.0-1_amd64.deb
   ```
 
 - **AppImage (any distribution):**
   ```bash
-  chmod +x ayuz-1.0.9-1.AppImage
-  ./ayuz-1.0.9-1.AppImage
+  chmod +x ayuz-1.1.0-1.AppImage
+  ./ayuz-1.1.0-1.AppImage
   ```
 
 ### Uninstall
@@ -358,7 +385,7 @@ Requires [`appimagetool`](https://github.com/AppImage/AppImageKit/releases) on y
 ```bash
 cargo install cargo-appimage
 cargo appimage
-./target/appimage/ayuz-1.0.9-1.AppImage
+./target/appimage/ayuz-1.1.0-1.AppImage
 ```
 
 ---
