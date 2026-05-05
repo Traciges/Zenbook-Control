@@ -60,4 +60,4 @@ auto_link_exclude_list = [
 ]
 icon = "assets/trayicon.png"
 desktop_entry = "packaging/ayuz-appimage.desktop"
-assets = ["packaging/appimage/usr"]
+assets = ["packaging/appimage/usr", "assets/anime"]
