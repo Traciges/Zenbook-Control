@@ -40,6 +40,7 @@ use crate::components::system::battery::BatteryMsg;
 use crate::components::system::fan::FanMsg;
 use crate::components::system::gpu::GpuMsg;
 use crate::services::dbus::FanProfile;
+use crate::components::animatrix::{AnimatrixModel, AnimatrixMsg};
 use crate::components::aura::AuraModel;
 use crate::components::aura::AuraMsg;
 use crate::components::keyboard::AutoBacklightModel;
@@ -122,6 +123,7 @@ pub struct AppModel {
     oled_care: Controller<OledCareModel>,
     color_gamut: Controller<ColorGamutModel>,
     aura: Controller<AuraModel>,
+    animatrix: Controller<AnimatrixModel>,
     fn_key: Controller<FnKeyModel>,
     gestures: Controller<GesturesModel>,
     touchpad: Controller<TouchpadModel>,
@@ -223,6 +225,18 @@ impl SimpleComponent for AppModel {
                     colour_g: p.aura_colour_g,
                     colour_b: p.aura_colour_b,
                 });
+                self.animatrix.sender().emit(AnimatrixMsg::LoadProfile {
+                    enable_display: p.animatrix_enable_display,
+                    brightness: p.animatrix_brightness,
+                    builtins_enabled: p.animatrix_builtins_enabled,
+                    boot_anim: p.animatrix_boot_anim.clone(),
+                    awake_anim: p.animatrix_awake_anim.clone(),
+                    sleep_anim: p.animatrix_sleep_anim.clone(),
+                    shutdown_anim: p.animatrix_shutdown_anim.clone(),
+                    off_unplugged: p.animatrix_off_when_unplugged,
+                    off_suspended: p.animatrix_off_when_suspended,
+                    off_lid_closed: p.animatrix_off_when_lid_closed,
+                });
                 self.touchpad.sender().emit(TouchpadMsg::LoadProfile(p.touchpad_active));
                 self.gestures.sender().emit(GesturesMsg::LoadProfile(p.input_gestures_active));
                 self.fn_key.sender().emit(FnKeyMsg::LoadProfile(p.input_fn_key_locked));
@@ -295,6 +309,7 @@ impl SimpleComponent for AppModel {
         let oled_care = launch_component!(OledCareModel, sender);
         let color_gamut = launch_component!(ColorGamutModel, sender);
         let aura = launch_component!(AuraModel, sender);
+        let animatrix = launch_component!(AnimatrixModel, sender);
         let fn_key = launch_component!(FnKeyModel, sender);
         let gestures = launch_component!(GesturesModel, sender);
         let touchpad = launch_component!(TouchpadModel, sender);
@@ -326,6 +341,7 @@ impl SimpleComponent for AppModel {
             oled_care,
             color_gamut,
             aura,
+            animatrix,
             fn_key,
             gestures,
             touchpad,
@@ -345,6 +361,7 @@ impl SimpleComponent for AppModel {
         let oled_care_widget = model.oled_care.widget();
         let color_gamut_widget = model.color_gamut.widget();
         let aura_widget = model.aura.widget();
+        let animatrix_widget = model.animatrix.widget();
         let fn_key_widget = model.fn_key.widget();
         let gestures_widget = model.gestures.widget();
         let touchpad_widget = model.touchpad.widget();
@@ -363,6 +380,7 @@ impl SimpleComponent for AppModel {
 
         let aura_page = adw::PreferencesPage::new();
         aura_page.add(aura_widget);
+        aura_page.add(animatrix_widget);
 
         let keyboard_page = adw::PreferencesPage::new();
         keyboard_page.add(auto_backlight_widget);
@@ -487,6 +505,7 @@ impl SimpleComponent for AppModel {
                 color_gamut_widget.clone().upcast::<gtk4::Widget>(),
             ),
             ("aura", aura_widget.clone().upcast::<gtk4::Widget>()),
+            ("animatrix", animatrix_widget.clone().upcast::<gtk4::Widget>()),
             (
                 "auto_backlight",
                 auto_backlight_widget.clone().upcast::<gtk4::Widget>(),

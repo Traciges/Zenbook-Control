@@ -17,5 +17,6 @@
 pub mod commands;
 pub mod config;
 pub mod dbus;
+pub mod dbus_animatrix;
 pub mod edge_gestures;
 pub mod migration;

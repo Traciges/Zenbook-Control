@@ -113,7 +113,7 @@ impl Component for AuraModel {
                 #[watch]
                 set_visible: model.aura_status == AuraStatus::HardwareNotSupported,
                 set_label: &t!("aura_hardware_missing_warning"),
-                add_css_class: "dim-label",
+                add_css_class: "error",
                 set_wrap: true,
                 set_xalign: 0.0,
                 set_margin_top: 8,

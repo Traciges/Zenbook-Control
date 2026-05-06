@@ -48,6 +48,27 @@ fn default_aura_brightness() -> u32 {
 fn default_aura_colour_r() -> u8 {
     166
 }
+fn default_animatrix_enable() -> bool {
+    true
+}
+fn default_animatrix_brightness() -> u32 {
+    2
+}
+fn default_animatrix_builtins() -> bool {
+    true
+}
+fn default_animatrix_boot_anim() -> String {
+    "GlitchConstruction".to_string()
+}
+fn default_animatrix_awake_anim() -> String {
+    "BinaryBannerScroll".to_string()
+}
+fn default_animatrix_sleep_anim() -> String {
+    "BannerSwipe".to_string()
+}
+fn default_animatrix_shutdown_anim() -> String {
+    "GlitchOut".to_string()
+}
 
 fn generate_profile_id() -> String {
     use std::time::{SystemTime, UNIX_EPOCH};
@@ -107,6 +128,28 @@ pub struct Profile {
     pub aura_colour_g: u8,
     #[serde(default)]
     pub aura_colour_b: u8,
+
+    // AniMatrix LED panel
+    #[serde(default = "default_animatrix_enable")]
+    pub animatrix_enable_display: bool,
+    #[serde(default = "default_animatrix_brightness")]
+    pub animatrix_brightness: u32,
+    #[serde(default = "default_animatrix_builtins")]
+    pub animatrix_builtins_enabled: bool,
+    #[serde(default = "default_animatrix_boot_anim")]
+    pub animatrix_boot_anim: String,
+    #[serde(default = "default_animatrix_awake_anim")]
+    pub animatrix_awake_anim: String,
+    #[serde(default = "default_animatrix_sleep_anim")]
+    pub animatrix_sleep_anim: String,
+    #[serde(default = "default_animatrix_shutdown_anim")]
+    pub animatrix_shutdown_anim: String,
+    #[serde(default)]
+    pub animatrix_off_when_unplugged: bool,
+    #[serde(default)]
+    pub animatrix_off_when_suspended: bool,
+    #[serde(default)]
+    pub animatrix_off_when_lid_closed: bool,
 }
 
 impl Default for Profile {
@@ -142,6 +185,16 @@ impl Default for Profile {
             aura_colour_r: 166,
             aura_colour_g: 0,
             aura_colour_b: 0,
+            animatrix_enable_display: true,
+            animatrix_brightness: 2,
+            animatrix_builtins_enabled: true,
+            animatrix_boot_anim: "GlitchConstruction".to_string(),
+            animatrix_awake_anim: "BinaryBannerScroll".to_string(),
+            animatrix_sleep_anim: "BannerSwipe".to_string(),
+            animatrix_shutdown_anim: "GlitchOut".to_string(),
+            animatrix_off_when_unplugged: false,
+            animatrix_off_when_suspended: false,
+            animatrix_off_when_lid_closed: false,
         }
     }
 }
@@ -340,6 +393,16 @@ impl AppConfig {
             aura_colour_r: 166,
             aura_colour_g: 0,
             aura_colour_b: 0,
+            animatrix_enable_display: true,
+            animatrix_brightness: 2,
+            animatrix_builtins_enabled: true,
+            animatrix_boot_anim: "GlitchConstruction".to_string(),
+            animatrix_awake_anim: "BinaryBannerScroll".to_string(),
+            animatrix_sleep_anim: "BannerSwipe".to_string(),
+            animatrix_shutdown_anim: "GlitchOut".to_string(),
+            animatrix_off_when_unplugged: false,
+            animatrix_off_when_suspended: false,
+            animatrix_off_when_lid_closed: false,
         });
         self.active_profile_id = id;
         self.save();

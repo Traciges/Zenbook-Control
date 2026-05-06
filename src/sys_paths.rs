@@ -25,3 +25,25 @@ pub const SYS_LOAD_AVG: &str = "/proc/loadavg";
 pub const SYS_MEM_INFO: &str = "/proc/meminfo";
 pub const SYS_THERMAL_ZONE0_TEMP: &str = "/sys/class/thermal/thermal_zone0/temp";
 pub const SYS_MEM_SLEEP: &str = "/sys/power/mem_sleep";
+
+/// Resolves the directory where AniMatrix GIF assets are stored.
+///
+/// Resolution order:
+/// 1. `CARGO_MANIFEST_DIR/assets/anime` — cargo dev runs
+/// 2. `$APPDIR/assets/anime` — inside a running AppImage
+/// 3. `<binary_parent>/../share/ayuz/anime` — installed via deb/rpm (e.g. `/usr/share/ayuz/anime`)
+pub fn anime_assets_dir() -> std::path::PathBuf {
+    if let Ok(manifest) = std::env::var("CARGO_MANIFEST_DIR") {
+        return std::path::PathBuf::from(manifest).join("assets/anime");
+    }
+    if let Ok(appdir) = std::env::var("APPDIR") {
+        return std::path::PathBuf::from(appdir).join("assets/anime");
+    }
+    std::env::current_exe()
+        .unwrap_or_default()
+        .parent()
+        .unwrap_or(std::path::Path::new("/usr/bin"))
+        .parent()
+        .unwrap_or(std::path::Path::new("/usr"))
+        .join("share/ayuz/anime")
+}

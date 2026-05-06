@@ -150,6 +150,35 @@ static SEARCH_INDEX: &[SearchItem] = &[
         page_name: "aura",
         component_key: "aura",
     },
+    // AniMatrix
+    SearchItem {
+        title_key: "animatrix_group_title",
+        page_icon: "preferences-color-symbolic",
+        page_title_key: "tab_aura",
+        page_name: "aura",
+        component_key: "animatrix",
+    },
+    SearchItem {
+        title_key: "animatrix_enable_title",
+        page_icon: "preferences-color-symbolic",
+        page_title_key: "tab_aura",
+        page_name: "aura",
+        component_key: "animatrix",
+    },
+    SearchItem {
+        title_key: "animatrix_brightness_title",
+        page_icon: "preferences-color-symbolic",
+        page_title_key: "tab_aura",
+        page_name: "aura",
+        component_key: "animatrix",
+    },
+    SearchItem {
+        title_key: "animatrix_gallery_title",
+        page_icon: "preferences-color-symbolic",
+        page_title_key: "tab_aura",
+        page_name: "aura",
+        component_key: "animatrix",
+    },
     // Keyboard
     SearchItem {
         title_key: "backlight_auto_on_title",
