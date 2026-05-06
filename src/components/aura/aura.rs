@@ -228,7 +228,11 @@ impl Component for AuraModel {
                     let raw_modes = match dbus::get_aura_supported_modes().await {
                         Ok(v) => v,
                         Err(e) => {
-                            out.emit(AuraCommandOutput::Error(e));
+                            if e.contains("UnknownObject") {
+                                out.emit(AuraCommandOutput::AuraStatusChecked(AuraStatus::HardwareNotSupported));
+                            } else {
+                                out.emit(AuraCommandOutput::Error(e));
+                            }
                             return;
                         }
                     };
@@ -238,14 +242,22 @@ impl Component for AuraModel {
                     let current_effect = match dbus::get_aura_effect().await {
                         Ok(e) => e,
                         Err(e) => {
-                            out.emit(AuraCommandOutput::Error(e));
+                            if e.contains("UnknownObject") {
+                                out.emit(AuraCommandOutput::AuraStatusChecked(AuraStatus::HardwareNotSupported));
+                            } else {
+                                out.emit(AuraCommandOutput::Error(e));
+                            }
                             return;
                         }
                     };
                     let brightness = match dbus::get_aura_brightness().await {
                         Ok(b) => b,
                         Err(e) => {
-                            out.emit(AuraCommandOutput::Error(e));
+                            if e.contains("UnknownObject") {
+                                out.emit(AuraCommandOutput::AuraStatusChecked(AuraStatus::HardwareNotSupported));
+                            } else {
+                                out.emit(AuraCommandOutput::Error(e));
+                            }
                             return;
                         }
                     };
