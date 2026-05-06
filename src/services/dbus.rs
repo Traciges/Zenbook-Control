@@ -343,6 +343,13 @@ pub async fn get_apu_mem_options() -> Result<Vec<i32>, String> {
 
 use zbus::zvariant::{OwnedValue, Type, Value};
 
+/// Fallback lighting modes for TUF / single-zone keyboards (Static, Breathe, RainbowCycle,
+/// RainbowWave, Pulse). Sourced from `basic_modes` entries in rog-aura/data/aura_support.ron.
+pub const TUF_FALLBACK_MODES: &[u32] = &[0, 1, 2, 3, 10];
+
+/// `AuraDeviceType` discriminant for TUF laptops in asusd.
+const AURA_DEVICE_TYPE_TUF: u32 = 2;
+
 /// Active lighting mode. Maps directly to the `AuraModeNum` discriminants in rog-aura.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u32)]
@@ -449,6 +456,9 @@ trait Aura {
 
     #[zbus(property)]
     fn supported_basic_modes(&self) -> zbus::Result<Vec<u32>>;
+
+    #[zbus(property)]
+    fn device_type(&self) -> zbus::Result<u32>;
 }
 
 /// Lazily-initialized singleton proxy to the `xyz.ljones.Aura` D-Bus object.
@@ -467,11 +477,14 @@ async fn aura_proxy() -> Result<&'static AuraProxy<'static>, String> {
         .await
 }
 
-/// Describes the three possible states of Aura RGB support on this system.
+/// Describes the possible states of Aura RGB support on this system.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AuraStatus {
-    /// `asusd` is running and the `xyz.ljones.Aura` interface is available.
+    /// `asusd` is running and the `xyz.ljones.Aura` interface is available (full Aura matrix).
     Available,
+    /// `asusd` is running, `xyz.ljones.Aura` is registered, but the device is a TUF /
+    /// single-zone keyboard (DeviceType == 2). Only basic modes are supported.
+    SingleZoneAvailable,
     /// `asusd` is running but this laptop has no Aura-capable keyboard.
     HardwareNotSupported,
     /// `asusd` is not installed or not running.
@@ -510,6 +523,16 @@ pub async fn check_aura_status() -> AuraStatus {
         .any(|ifaces| ifaces.contains_key("xyz.ljones.Aura"));
 
     if has_aura {
+        // Probe DeviceType to distinguish TUF single-zone keyboards (type 2) from
+        // full Aura multi-zone devices.  Any failure to read the property is treated
+        // as a full-Aura device so we never accidentally hide the controls.
+        if let Ok(proxy) = AuraProxy::new(&conn).await {
+            if let Ok(dt) = proxy.device_type().await {
+                if dt == AURA_DEVICE_TYPE_TUF {
+                    return AuraStatus::SingleZoneAvailable;
+                }
+            }
+        }
         AuraStatus::Available
     } else {
         AuraStatus::HardwareNotSupported

@@ -22,7 +22,7 @@ use zbus::zvariant::{OwnedValue, Type, Value};
 
 /// Which AniMatrix panel variant this machine has, detected from DMI board name.
 ///
-/// `Unsupported` means no AniMatrix hardware — the entire UI section is hidden.
+/// `Unsupported` means no AniMatrix hardware - the entire UI section is hidden.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AnimatrixHardwareType {
     GA401,

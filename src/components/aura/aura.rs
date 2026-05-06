@@ -22,7 +22,7 @@ use relm4::prelude::*;
 use rust_i18n::t;
 
 use crate::services::config::AppConfig;
-use crate::services::dbus::{self, AuraEffect, AuraModeNum, AuraStatus, Colour};
+use crate::services::dbus::{self, AuraEffect, AuraModeNum, AuraStatus, Colour, TUF_FALLBACK_MODES};
 
 /// State for the Aura RGB keyboard lighting component.
 pub struct AuraModel {
@@ -122,20 +122,33 @@ impl Component for AuraModel {
                 set_margin_bottom: 4,
             },
 
+            add = &gtk::Label {
+                #[watch]
+                set_visible: model.aura_status == AuraStatus::SingleZoneAvailable,
+                set_label: &t!("aura_single_zone_info"),
+                add_css_class: "dim-label",
+                set_wrap: true,
+                set_xalign: 0.0,
+                set_margin_top: 8,
+                set_margin_start: 12,
+                set_margin_end: 12,
+                set_margin_bottom: 4,
+            },
+
             add = &model.mode_combo.clone() -> adw::ComboRow {
                 set_title: &t!("aura_mode_title"),
                 #[watch]
-                set_sensitive: model.aura_status == AuraStatus::Available,
+                set_sensitive: matches!(model.aura_status, AuraStatus::Available | AuraStatus::SingleZoneAvailable),
             },
 
             add = &model.brightness_combo.clone() -> adw::ComboRow {
                 #[watch]
-                set_sensitive: model.aura_status == AuraStatus::Available,
+                set_sensitive: matches!(model.aura_status, AuraStatus::Available | AuraStatus::SingleZoneAvailable),
             },
 
             add = &model.colour_row.clone() -> adw::ActionRow {
                 #[watch]
-                set_sensitive: model.aura_status == AuraStatus::Available
+                set_sensitive: matches!(model.aura_status, AuraStatus::Available | AuraStatus::SingleZoneAvailable)
                     && !model.current_mode.is_colour_irrelevant(),
             },
         }
@@ -216,20 +229,31 @@ impl Component for AuraModel {
 
         let widgets = view_output!();
 
-        sender.command(|out, shutdown| {
+        sender.command(move |out, shutdown| {
             shutdown
                 .register(async move {
                     let status = dbus::check_aura_status().await;
                     out.emit(AuraCommandOutput::AuraStatusChecked(status));
-                    if status != AuraStatus::Available {
+                    let is_single_zone = status == AuraStatus::SingleZoneAvailable;
+                    if status != AuraStatus::Available && !is_single_zone {
                         return;
                     }
 
                     let raw_modes = match dbus::get_aura_supported_modes().await {
-                        Ok(v) => v,
+                        Ok(v) if !v.is_empty() => v,
+                        // TUF may return empty or UnknownObject - use hardcoded fallback.
+                        Ok(_) | Err(_) if is_single_zone => TUF_FALLBACK_MODES.to_vec(),
+                        Ok(_) => {
+                            out.emit(AuraCommandOutput::AuraStatusChecked(
+                                AuraStatus::HardwareNotSupported,
+                            ));
+                            return;
+                        }
                         Err(e) => {
                             if e.contains("UnknownObject") {
-                                out.emit(AuraCommandOutput::AuraStatusChecked(AuraStatus::HardwareNotSupported));
+                                out.emit(AuraCommandOutput::AuraStatusChecked(
+                                    AuraStatus::HardwareNotSupported,
+                                ));
                             } else {
                                 out.emit(AuraCommandOutput::Error(e));
                             }
@@ -241,9 +265,20 @@ impl Component for AuraModel {
 
                     let current_effect = match dbus::get_aura_effect().await {
                         Ok(e) => e,
+                        // TUF may not expose led_mode_data - fall back to saved config values.
+                        Err(_) if is_single_zone => AuraEffect {
+                            mode: saved_mode as u32,
+                            zone: 0,
+                            colour1: saved_colour,
+                            colour2: Colour { r: 0, g: 0, b: 0 },
+                            speed: "Med".to_string(),
+                            direction: "Right".to_string(),
+                        },
                         Err(e) => {
                             if e.contains("UnknownObject") {
-                                out.emit(AuraCommandOutput::AuraStatusChecked(AuraStatus::HardwareNotSupported));
+                                out.emit(AuraCommandOutput::AuraStatusChecked(
+                                    AuraStatus::HardwareNotSupported,
+                                ));
                             } else {
                                 out.emit(AuraCommandOutput::Error(e));
                             }
@@ -252,9 +287,13 @@ impl Component for AuraModel {
                     };
                     let brightness = match dbus::get_aura_brightness().await {
                         Ok(b) => b,
+                        // TUF may not expose brightness - fall back to saved config value.
+                        Err(_) if is_single_zone => saved_brightness,
                         Err(e) => {
                             if e.contains("UnknownObject") {
-                                out.emit(AuraCommandOutput::AuraStatusChecked(AuraStatus::HardwareNotSupported));
+                                out.emit(AuraCommandOutput::AuraStatusChecked(
+                                    AuraStatus::HardwareNotSupported,
+                                ));
                             } else {
                                 out.emit(AuraCommandOutput::Error(e));
                             }
