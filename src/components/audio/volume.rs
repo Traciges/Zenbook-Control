@@ -22,12 +22,14 @@ use rust_i18n::t;
 
 pub struct VolumeModel {
     volume: f64,
+    muted: bool,
 }
 
 #[derive(Debug)]
 pub enum VolumeMsg {
     SetVolume(f64),
-    UpdateUi(f64),
+    ToggleMute,
+    UpdateUi { vol: f64, muted: bool },
     LoadProfile(f64),
 }
 
@@ -47,15 +49,33 @@ impl SimpleComponent for VolumeModel {
             add = &adw::ActionRow {
                 set_title: &t!("volume_level_label"),
 
+                add_suffix = &gtk::ToggleButton {
+                    set_valign: gtk::Align::Center,
+                    add_css_class: "flat",
+                    #[watch]
+                    set_icon_name: if model.muted {
+                        "audio-volume-muted-symbolic"
+                    } else {
+                        "audio-volume-high-symbolic"
+                    },
+                    #[watch]
+                    #[block_signal(toggle_handler)]
+                    set_active: model.muted,
+                    connect_toggled[sender] => move |_| {
+                        sender.input(VolumeMsg::ToggleMute);
+                    } @toggle_handler,
+                },
+
                 add_suffix = &gtk::Scale {
                     set_orientation: gtk::Orientation::Horizontal,
                     set_range: (0.0, 150.0),
                     #[watch]
+                    #[block_signal(vol_handler)]
                     set_value: model.volume,
                     set_width_request: 200,
                     connect_value_changed[sender] => move |scale| {
                         sender.input(VolumeMsg::SetVolume(scale.value()));
-                    },
+                    } @vol_handler,
                 },
 
                 add_suffix = &gtk::Label {
@@ -74,27 +94,38 @@ impl SimpleComponent for VolumeModel {
     ) -> ComponentParts<Self> {
         let sender_clone = sender.clone();
         tokio::spawn(async move {
-            let vol = read_current_volume().await.unwrap_or(100.0);
-            sender_clone.input(VolumeMsg::UpdateUi(vol));
+            let (vol, muted) = read_current_volume().await.unwrap_or((100.0, false));
+            sender_clone.input(VolumeMsg::UpdateUi { vol, muted });
         });
 
         tokio::spawn(start_volume_listener(sender.clone()));
 
-        let model = VolumeModel { volume: 100.0 };
+        let model = VolumeModel {
+            volume: 100.0,
+            muted: false,
+        };
         let widgets = view_output!();
         ComponentParts { model, widgets }
     }
 
     fn update(&mut self, msg: VolumeMsg, _sender: ComponentSender<Self>) {
         match msg {
-            VolumeMsg::UpdateUi(vol) => {
+            VolumeMsg::UpdateUi { vol, muted } => {
                 self.volume = vol;
+                self.muted = muted;
             }
             VolumeMsg::SetVolume(vol) => {
+                if (vol as i32) == (self.volume as i32) {
+                    return;
+                }
                 self.volume = vol;
+                self.muted = false;
                 crate::services::config::AppConfig::update(|c| {
                     c.active_profile_mut().volume = vol;
                 });
+                let _ = tokio::process::Command::new("wpctl")
+                    .args(["set-mute", "@DEFAULT_AUDIO_SINK@", "0"])
+                    .spawn();
                 let _ = tokio::process::Command::new("wpctl")
                     .args([
                         "set-volume",
@@ -103,8 +134,21 @@ impl SimpleComponent for VolumeModel {
                     ])
                     .spawn();
             }
+            VolumeMsg::ToggleMute => {
+                self.muted = !self.muted;
+                let _ = tokio::process::Command::new("wpctl")
+                    .args(["set-mute", "@DEFAULT_AUDIO_SINK@", "toggle"])
+                    .spawn();
+            }
             VolumeMsg::LoadProfile(vol) => {
+                if (vol as i32) == (self.volume as i32) {
+                    return;
+                }
                 self.volume = vol;
+                self.muted = false;
+                let _ = tokio::process::Command::new("wpctl")
+                    .args(["set-mute", "@DEFAULT_AUDIO_SINK@", "0"])
+                    .spawn();
                 let _ = tokio::process::Command::new("wpctl")
                     .args([
                         "set-volume",
@@ -117,17 +161,18 @@ impl SimpleComponent for VolumeModel {
     }
 }
 
-async fn read_current_volume() -> Option<f64> {
+async fn read_current_volume() -> Option<(f64, bool)> {
     let out = tokio::process::Command::new("wpctl")
         .args(["get-volume", "@DEFAULT_AUDIO_SINK@"])
         .output()
         .await
         .ok()?;
     let text = String::from_utf8_lossy(&out.stdout);
-    // Format: "Volume: 0.45"
+    // Format: "Volume: 0.45" or "Volume: 0.45 [MUTED]"
     let vol_str = text.split_whitespace().nth(1)?;
     let val = vol_str.parse::<f64>().ok()?;
-    Some(val * 100.0)
+    let muted = text.contains("[MUTED]");
+    Some((val * 100.0, muted))
 }
 
 async fn start_volume_listener(sender: relm4::ComponentSender<VolumeModel>) {
@@ -168,8 +213,8 @@ async fn start_volume_listener(sender: relm4::ComponentSender<VolumeModel>) {
                     }
                 }
             }
-            if let Some(vol) = read_current_volume().await {
-                sender.input(VolumeMsg::UpdateUi(vol));
+            if let Some((vol, muted)) = read_current_volume().await {
+                sender.input(VolumeMsg::UpdateUi { vol, muted });
             }
         }
     });

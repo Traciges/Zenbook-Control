@@ -217,6 +217,11 @@ pub async fn run_gesture_loop(mut shutdown: watch::Receiver<bool>) {
                             let dy = value - *last_y;
                             if dy.abs() >= STEP_THRESHOLD {
                                 *last_y = value;
+                                run_action(
+                                    "pactl",
+                                    &["set-sink-mute", "@DEFAULT_SINK@", "0"],
+                                )
+                                .await;
                                 if dy < 0 {
                                     run_action(
                                         "pactl",
