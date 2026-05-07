@@ -143,13 +143,11 @@ pub async fn set_fan_profile(profile: FanProfile) -> Result<FanProfile, String> 
     let proxy = platform_proxy().await?;
     match proxy.set_platform_profile(profile as u32).await {
         Ok(_) => Ok(profile),
-        Err(e) if profile == FanProfile::Quiet && e.to_string().contains("NotSupported") => {
-            proxy
-                .set_platform_profile(FanProfile::LowPower as u32)
-                .await
-                .map(|_| FanProfile::LowPower)
-                .map_err(|e2| t!("error_fan_profile_write", error = e2.to_string()).to_string())
-        }
+        Err(e) if profile == FanProfile::Quiet && e.to_string().contains("NotSupported") => proxy
+            .set_platform_profile(FanProfile::LowPower as u32)
+            .await
+            .map(|_| FanProfile::LowPower)
+            .map_err(|e2| t!("error_fan_profile_write", error = e2.to_string()).to_string()),
         Err(e) => Err(t!("error_fan_profile_write", error = e.to_string()).to_string()),
     }
 }
@@ -462,8 +460,7 @@ trait Aura {
 }
 
 /// Lazily-initialized singleton proxy to the `xyz.ljones.Aura` D-Bus object.
-static AURA_PROXY: tokio::sync::OnceCell<AuraProxy<'static>> =
-    tokio::sync::OnceCell::const_new();
+static AURA_PROXY: tokio::sync::OnceCell<AuraProxy<'static>> = tokio::sync::OnceCell::const_new();
 
 /// Returns a reference to the shared [`AuraProxy`], initialising it on first call.
 async fn aura_proxy() -> Result<&'static AuraProxy<'static>, String> {
@@ -482,7 +479,7 @@ async fn aura_proxy() -> Result<&'static AuraProxy<'static>, String> {
 pub enum AuraStatus {
     /// `asusd` is running and the `xyz.ljones.Aura` interface is available (full Aura matrix).
     Available,
-    /// `asusd` is running, `xyz.ljones.Aura` is registered, but the device is a TUF /
+    /// `asusd` is running, `xyz.ljones.Aura` is registered, but the device is a
     /// single-zone keyboard (DeviceType == 2). Only basic modes are supported.
     SingleZoneAvailable,
     /// `asusd` is running but this laptop has no Aura-capable keyboard.
@@ -491,51 +488,28 @@ pub enum AuraStatus {
     DaemonNotRunning,
 }
 
-/// Detects Aura availability by querying the D-Bus ObjectManager on `asusd`.
-///
-/// Distinguishes between the daemon not running and the hardware simply not
-/// supporting Aura (e.g. non-RGB keyboard), so callers can show accurate messages.
+/// Detects Aura availability by probing the `xyz.ljones.Aura` interface directly.
 pub async fn check_aura_status() -> AuraStatus {
     let conn = match zbus::Connection::system().await {
         Ok(c) => c,
         Err(_) => return AuraStatus::DaemonNotRunning,
     };
 
-    let manager = match zbus::fdo::ObjectManagerProxy::builder(&conn)
-        .destination("xyz.ljones.Asusd")
-        .unwrap()
-        .path("/")
-        .unwrap()
-        .build()
-        .await
-    {
-        Ok(m) => m,
-        Err(_) => return AuraStatus::DaemonNotRunning,
+    // Confirm asusd itself is on the bus before deciding the keyboard is unsupported.
+    match PlatformProxy::new(&conn).await {
+        Ok(p) if p.platform_profile().await.is_ok() => {}
+        _ => return AuraStatus::DaemonNotRunning,
+    }
+
+    let proxy = match AuraProxy::new(&conn).await {
+        Ok(p) => p,
+        Err(_) => return AuraStatus::HardwareNotSupported,
     };
 
-    let objects = match manager.get_managed_objects().await {
-        Ok(o) => o,
-        Err(_) => return AuraStatus::DaemonNotRunning,
-    };
-
-    let has_aura = objects
-        .values()
-        .any(|ifaces| ifaces.contains_key("xyz.ljones.Aura"));
-
-    if has_aura {
-        // Probe DeviceType to distinguish TUF single-zone keyboards (type 2) from
-        // full Aura multi-zone devices.  Any failure to read the property is treated
-        // as a full-Aura device so we never accidentally hide the controls.
-        if let Ok(proxy) = AuraProxy::new(&conn).await {
-            if let Ok(dt) = proxy.device_type().await {
-                if dt == AURA_DEVICE_TYPE_TUF {
-                    return AuraStatus::SingleZoneAvailable;
-                }
-            }
-        }
-        AuraStatus::Available
-    } else {
-        AuraStatus::HardwareNotSupported
+    match proxy.device_type().await {
+        Ok(AURA_DEVICE_TYPE_TUF) => AuraStatus::SingleZoneAvailable,
+        Ok(_) => AuraStatus::Available,
+        Err(_) => AuraStatus::HardwareNotSupported,
     }
 }
 
