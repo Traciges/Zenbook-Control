@@ -14,11 +14,21 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see https://www.gnu.org/licenses/.
 
-pub mod commands;
-pub mod config;
-pub mod dbus;
-pub mod dbus_animatrix;
-pub mod edge_gestures;
-pub(crate) mod evdev_runner;
-pub mod fan_hotkey;
-pub mod migration;
+//! Shared helpers for evdev-based listener services (`fan_hotkey`,
+//! `edge_gestures`). Device enumeration criteria differ per consumer, but the
+//! stream-open + error logging boilerplate is identical.
+
+use evdev::{Device, EventStream};
+use rust_i18n::t;
+
+/// Converts a [`Device`] into an [`EventStream`], logging a warning and
+/// returning `None` if the conversion fails.
+pub fn open_event_stream(device: Device) -> Option<EventStream> {
+    match device.into_event_stream() {
+        Ok(s) => Some(s),
+        Err(e) => {
+            tracing::warn!("{}", t!("error_event_read", error = e.to_string()));
+            None
+        }
+    }
+}

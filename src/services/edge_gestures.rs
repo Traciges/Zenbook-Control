@@ -18,6 +18,8 @@ use evdev::{AbsoluteAxisCode, Device, EventSummary, KeyCode};
 use rust_i18n::t;
 use tokio::sync::watch;
 
+use crate::services::evdev_runner::open_event_stream;
+
 /// Fraction of touchpad width/height that counts as an edge zone (4%)
 const EDGE_PERCENT: f64 = 0.04;
 /// Minimum movement in touchpad units required to trigger an action
@@ -149,12 +151,8 @@ pub async fn run_gesture_loop(mut shutdown: watch::Receiver<bool>) {
     let right_bound = (x_max as f64 * (1.0 - EDGE_PERCENT)) as i32;
     let top_bound = (y_max as f64 * EDGE_PERCENT) as i32;
 
-    let mut stream = match device.into_event_stream() {
-        Ok(s) => s,
-        Err(e) => {
-            tracing::warn!("Failed to open event stream: {e}");
-            return;
-        }
+    let Some(mut stream) = open_event_stream(device) else {
+        return;
     };
 
     let mut state = GestureState::Idle;
