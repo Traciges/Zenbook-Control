@@ -31,7 +31,7 @@ use crate::services::dbus_animatrix::{
 enum HwFilter {
     /// Works on GA401 only (rog_anime 1.3.0 fixed-size buffer).
     Ga401Only,
-    /// Works only on GU604 — hidden until a newer library version is used.
+    /// Works only on GU604 - hidden until a newer library version is used.
     Gu604Only,
 }
 

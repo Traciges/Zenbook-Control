@@ -91,7 +91,7 @@ The application is smart about availability: if a required tool or desktop envir
 | Feature           | Description                                                                                                                   | Requires |
 | ----------------- | ----------------------------------------------------------------------------------------------------------------------------- | -------- |
 | Lighting Mode     | Choose from 12 modes: Static, Breathe, Rainbow Cycle, Rainbow Wave, Star, Rain, Highlight, Laser, Ripple, Pulse, Comet, Flash | `asusd`  |
-| Color Control     | Set primary and secondary colors (RGB) — secondary color available for Breathe and Star modes                                 | `asusd`  |
+| Color Control     | Set primary and secondary colors (RGB) - secondary color available for Breathe and Star modes                                 | `asusd`  |
 | Brightness        | Four brightness levels: Off, Low, Medium, High                                                                                | `asusd`  |
 | Speed & Direction | Control animation speed (Low/Medium/High) and direction (Rainbow Wave only)                                                   | `asusd`  |
 | Power Settings    | Configure LED behavior per zone for Boot, Awake, Sleep, and Shutdown states                                                   | `asusd`  |
