@@ -18,23 +18,10 @@ use directories::ProjectDirs;
 use serde::{Deserialize, Serialize};
 use std::fs;
 
-fn default_brighten_threshold() -> f64 {
-    12.0
-}
-fn default_dim_threshold() -> f64 {
-    35.0
-}
-fn default_touchpad_active() -> bool {
-    true
-}
-fn default_dc_dimming() -> u32 {
-    100
-}
+use super::migration::LegacyAppConfig;
+
 fn default_language() -> String {
     "en".to_string()
-}
-fn default_profiles() -> Vec<Profile> {
-    vec![]
 }
 fn default_profile_icon() -> String {
     "computer-symbolic".to_string()
@@ -210,64 +197,16 @@ pub struct AppConfig {
     pub language: String,
     #[serde(default)]
     pub skip_legacy_migration: bool,
-    #[serde(default = "default_true")]
-    pub show_fan_osd: bool,
+    #[serde(default = "default_true", alias = "show_fan_osd")]
+    pub fan_osd_enabled: bool,
     #[serde(default = "default_true")]
     pub fan_hotkey_enabled: bool,
 
     // ── Profile management ───────────────────────────────────────────────────
     #[serde(default)]
     pub active_profile_id: String,
-    #[serde(default = "default_profiles")]
+    #[serde(default)]
     pub profiles: Vec<Profile>,
-
-    // ── Legacy fields (read for migration only, never written) ────────────────
-    // Display
-    #[serde(default, skip_serializing)]
-    pub color_profile_index: u32,
-    #[serde(default = "default_dc_dimming", skip_serializing)]
-    pub oled_dc_dimming: u32,
-    #[serde(default, skip_serializing)]
-    pub target_mode_active: bool,
-    #[serde(default, skip_serializing)]
-    pub oled_care_pixel_refresh: bool,
-    #[serde(default, skip_serializing)]
-    pub oled_care_panel_autohide: bool,
-    #[serde(default, skip_serializing)]
-    pub oled_care_transparency: bool,
-    // Audio
-    #[serde(default, skip_serializing)]
-    pub audio_profile: u32,
-    // Keyboard
-    #[serde(default, skip_serializing)]
-    pub fan_profile: u32,
-    #[serde(default, skip_serializing)]
-    pub kbd_brighten_active: bool,
-    #[serde(default, skip_serializing)]
-    pub kbd_dim_active: bool,
-    #[serde(default, skip_serializing)]
-    pub kbd_timeout_mode: u32,
-    #[serde(default, skip_serializing)]
-    pub kbd_timeout_battery_ac_index: u32,
-    #[serde(default, skip_serializing)]
-    pub kbd_timeout_battery_only_index: u32,
-    #[serde(default = "default_brighten_threshold", skip_serializing)]
-    pub kbd_brighten_threshold: f64,
-    #[serde(default = "default_dim_threshold", skip_serializing)]
-    pub kbd_dim_threshold: f64,
-    #[serde(default = "default_touchpad_active", skip_serializing)]
-    pub touchpad_active: bool,
-    #[serde(default, skip_serializing)]
-    pub input_gestures_active: bool,
-    #[serde(default, skip_serializing)]
-    pub input_fn_key_locked: bool,
-    // System
-    #[serde(default, skip_serializing)]
-    pub battery_deep_sleep_active: bool,
-    #[serde(default, skip_serializing)]
-    pub gpu_mode: u32,
-    #[serde(default, skip_serializing)]
-    pub apu_mem: i32,
 }
 
 impl Default for AppConfig {
@@ -275,32 +214,10 @@ impl Default for AppConfig {
         Self {
             language: default_language(),
             skip_legacy_migration: false,
-            show_fan_osd: true,
+            fan_osd_enabled: true,
             fan_hotkey_enabled: true,
             active_profile_id: String::new(),
             profiles: vec![],
-            // legacy defaults
-            color_profile_index: 0,
-            oled_dc_dimming: default_dc_dimming(),
-            target_mode_active: false,
-            oled_care_pixel_refresh: false,
-            oled_care_panel_autohide: false,
-            oled_care_transparency: false,
-            audio_profile: 0,
-            fan_profile: 0,
-            kbd_brighten_active: false,
-            kbd_dim_active: false,
-            kbd_timeout_mode: 0,
-            kbd_timeout_battery_ac_index: 0,
-            kbd_timeout_battery_only_index: 0,
-            kbd_brighten_threshold: default_brighten_threshold(),
-            kbd_dim_threshold: default_dim_threshold(),
-            touchpad_active: default_touchpad_active(),
-            input_gestures_active: false,
-            input_fn_key_locked: false,
-            battery_deep_sleep_active: false,
-            gpu_mode: 0,
-            apu_mem: 0,
         }
     }
 }
@@ -364,55 +281,51 @@ impl AppConfig {
         &mut self.profiles[0]
     }
 
-    /// If `profiles` is empty (first run / upgrade from legacy config), creates a "Default"
-    /// profile seeded from the legacy flat fields and sets it as active.
+    /// If `profiles` is empty (first run / upgrade from pre-profile config), creates a
+    /// "Default" profile, seeding it from the legacy flat fields if any are present
+    /// in the on-disk config, otherwise from [`Profile::default`].
     pub fn ensure_default_profile(&mut self) {
         if !self.profiles.is_empty() {
             return;
         }
         let id = generate_profile_id();
-        self.profiles.push(Profile {
+        let mut profile = Profile {
             id: id.clone(),
             name: "Default".to_string(),
-            icon: "computer-symbolic".to_string(),
-            fan_profile: self.fan_profile,
-            oled_dc_dimming: self.oled_dc_dimming,
-            target_mode_active: self.target_mode_active,
-            color_profile_index: self.color_profile_index,
-            oled_care_pixel_refresh: self.oled_care_pixel_refresh,
-            oled_care_panel_autohide: self.oled_care_panel_autohide,
-            oled_care_transparency: self.oled_care_transparency,
-            audio_profile: self.audio_profile,
-            volume: 100.0,
-            kbd_timeout_mode: self.kbd_timeout_mode,
-            kbd_timeout_battery_ac_index: self.kbd_timeout_battery_ac_index,
-            kbd_timeout_battery_only_index: self.kbd_timeout_battery_only_index,
-            kbd_brighten_active: self.kbd_brighten_active,
-            kbd_dim_active: self.kbd_dim_active,
-            kbd_brighten_threshold: self.kbd_brighten_threshold,
-            kbd_dim_threshold: self.kbd_dim_threshold,
-            touchpad_active: self.touchpad_active,
-            input_gestures_active: self.input_gestures_active,
-            input_fn_key_locked: self.input_fn_key_locked,
-            battery_deep_sleep_active: self.battery_deep_sleep_active,
-            gpu_mode: self.gpu_mode,
-            apu_mem: self.apu_mem,
-            aura_mode: 0,
-            aura_brightness: 2,
-            aura_colour_r: 166,
-            aura_colour_g: 0,
-            aura_colour_b: 0,
-            animatrix_enable_display: true,
-            animatrix_brightness: 2,
-            animatrix_builtins_enabled: true,
-            animatrix_boot_anim: "GlitchConstruction".to_string(),
-            animatrix_awake_anim: "BinaryBannerScroll".to_string(),
-            animatrix_sleep_anim: "BannerSwipe".to_string(),
-            animatrix_shutdown_anim: "GlitchOut".to_string(),
-            animatrix_off_when_unplugged: false,
-            animatrix_off_when_suspended: false,
-            animatrix_off_when_lid_closed: false,
-        });
+            ..Profile::default()
+        };
+        if let Some(legacy) = LegacyAppConfig::try_load() {
+            profile.fan_profile = legacy.fan_profile;
+            profile.color_profile_index = legacy.color_profile_index;
+            profile.target_mode_active = legacy.target_mode_active;
+            profile.oled_care_pixel_refresh = legacy.oled_care_pixel_refresh;
+            profile.oled_care_panel_autohide = legacy.oled_care_panel_autohide;
+            profile.oled_care_transparency = legacy.oled_care_transparency;
+            profile.audio_profile = legacy.audio_profile;
+            profile.kbd_brighten_active = legacy.kbd_brighten_active;
+            profile.kbd_dim_active = legacy.kbd_dim_active;
+            profile.kbd_timeout_mode = legacy.kbd_timeout_mode;
+            profile.kbd_timeout_battery_ac_index = legacy.kbd_timeout_battery_ac_index;
+            profile.kbd_timeout_battery_only_index = legacy.kbd_timeout_battery_only_index;
+            profile.input_gestures_active = legacy.input_gestures_active;
+            profile.input_fn_key_locked = legacy.input_fn_key_locked;
+            profile.battery_deep_sleep_active = legacy.battery_deep_sleep_active;
+            profile.gpu_mode = legacy.gpu_mode;
+            profile.apu_mem = legacy.apu_mem;
+            if let Some(v) = legacy.oled_dc_dimming {
+                profile.oled_dc_dimming = v;
+            }
+            if let Some(v) = legacy.kbd_brighten_threshold {
+                profile.kbd_brighten_threshold = v;
+            }
+            if let Some(v) = legacy.kbd_dim_threshold {
+                profile.kbd_dim_threshold = v;
+            }
+            if let Some(v) = legacy.touchpad_active {
+                profile.touchpad_active = v;
+            }
+        }
+        self.profiles.push(profile);
         self.active_profile_id = id;
         self.save();
     }

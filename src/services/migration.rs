@@ -15,9 +15,54 @@
 // along with this program.  If not, see https://www.gnu.org/licenses/.
 
 use directories::BaseDirs;
+use serde::Deserialize;
 use std::path::PathBuf;
 
 use super::config::AppConfig;
+
+/// Legacy flat-schema fields that previous Ayuz versions wrote at the top
+/// level of `config.json`, before profiles were introduced. Deserialised
+/// once on first run after upgrade so a Default profile can be seeded from
+/// the user's existing values, then never touched again.
+#[derive(Deserialize, Default)]
+#[serde(default)]
+pub struct LegacyAppConfig {
+    // Display
+    pub color_profile_index: u32,
+    pub oled_dc_dimming: Option<u32>,
+    pub target_mode_active: bool,
+    pub oled_care_pixel_refresh: bool,
+    pub oled_care_panel_autohide: bool,
+    pub oled_care_transparency: bool,
+    // Audio
+    pub audio_profile: u32,
+    // Keyboard / system
+    pub fan_profile: u32,
+    pub kbd_brighten_active: bool,
+    pub kbd_dim_active: bool,
+    pub kbd_timeout_mode: u32,
+    pub kbd_timeout_battery_ac_index: u32,
+    pub kbd_timeout_battery_only_index: u32,
+    pub kbd_brighten_threshold: Option<f64>,
+    pub kbd_dim_threshold: Option<f64>,
+    pub touchpad_active: Option<bool>,
+    pub input_gestures_active: bool,
+    pub input_fn_key_locked: bool,
+    pub battery_deep_sleep_active: bool,
+    pub gpu_mode: u32,
+    pub apu_mem: i32,
+}
+
+impl LegacyAppConfig {
+    /// Reads `~/.config/ayuz/config.json` once and tries to extract any
+    /// legacy flat fields. Returns `None` if the file is absent or
+    /// unreadable; missing keys default to their type's default.
+    pub fn try_load() -> Option<Self> {
+        let path = AppConfig::config_dir()?.join("config.json");
+        let text = std::fs::read_to_string(&path).ok()?;
+        serde_json::from_str(&text).ok()
+    }
+}
 
 fn legacy_config_dir() -> Option<PathBuf> {
     BaseDirs::new().map(|d| d.config_dir().join("asus-hub"))
