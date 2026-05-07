@@ -553,6 +553,10 @@ impl SimpleComponent for AppModel {
             ("apu_mem", apu_mem_widget.clone().upcast::<gtk4::Widget>()),
             ("battery", battery_widget.clone().upcast::<gtk4::Widget>()),
             ("fan", fan_widget.clone().upcast::<gtk4::Widget>()),
+            (
+                "asus_key_hint",
+                asus_key_hint_group.clone().upcast::<gtk4::Widget>(),
+            ),
             ("gpu", gpu_widget.clone().upcast::<gtk4::Widget>()),
             ("lang", lang_group.clone().upcast::<gtk4::Widget>()),
         ]);

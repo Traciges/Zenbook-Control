@@ -222,6 +222,20 @@ static SEARCH_INDEX: &[SearchItem] = &[
         page_name: "keyboard",
         component_key: "fn_key",
     },
+    SearchItem {
+        title_key: "fan_hotkey_enable_title",
+        page_icon: "input-keyboard-symbolic",
+        page_title_key: "tab_keyboard",
+        page_name: "keyboard",
+        component_key: "asus_key_hint",
+    },
+    SearchItem {
+        title_key: "fan_osd_show_title",
+        page_icon: "input-keyboard-symbolic",
+        page_title_key: "tab_keyboard",
+        page_name: "keyboard",
+        component_key: "asus_key_hint",
+    },
     // Touchpad
     SearchItem {
         title_key: "gestures_group_title",
