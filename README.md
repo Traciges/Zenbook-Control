@@ -283,13 +283,13 @@ Add `ayuz` to your `flake.nix` inputs: `ayuz.url = "github:Traciges/Ayuz";`.
 **Fedora:**
 
 ```bash
-sudo dnf install gtk4-devel libadwaita-devel
+sudo dnf install gtk4-devel libadwaita-devel gtk4-layer-shell-devel
 ```
 
 **Arch:**
 
 ```bash
-sudo pacman -S gtk4 libadwaita
+sudo pacman -S gtk4 libadwaita gtk4-layer-shell
 ```
 
 ### 2. Install external tools
