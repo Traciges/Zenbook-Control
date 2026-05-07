@@ -85,6 +85,7 @@ The application is smart about availability: if a required tool or desktop envir
 | Automatic Backlight | Uses the ambient light sensor to automatically adjust keyboard brightness      | `iio-sensor-proxy` |
 | Backlight Idle Mode | Turns off backlight after inactivity (1/2/5 min), configurable per power state | `swayidle`         |
 | FN Key Mode         | Toggle between function key priority (F1-F12) and shortcut priority            | `asusd`            |
+| FN+F Fan Hotkey     | Cycles fan profiles globally (Balanced → Performance → Quiet → Balanced) via the hardware FN+F key; shows an on-screen notification on each switch | `asusd`            |
 
 ### Aura RGB
 
@@ -322,19 +323,19 @@ Download the package matching your distribution from the [GitHub Releases](https
 - **Fedora / RPM-based:**
 
   ```bash
-  sudo dnf install ./ayuz-1.1.1-1.x86_64.rpm
+  sudo dnf install ./ayuz-1.1.2-1.x86_64.rpm
   ```
 
 - **Debian / Ubuntu / DEB-based:**
 
   ```bash
-  sudo apt install ./ayuz_1.1.1-1_amd64.deb
+  sudo apt install ./ayuz_1.1.2-1_amd64.deb
   ```
 
 - **AppImage (any distribution):**
   ```bash
-  chmod +x ayuz-1.1.1-1.AppImage
-  ./ayuz-1.1.1-1.AppImage
+  chmod +x ayuz-1.1.2-1.AppImage
+  ./ayuz-1.1.2-1.AppImage
   ```
 
 ### Uninstall
@@ -386,7 +387,7 @@ Requires [`appimagetool`](https://github.com/AppImage/AppImageKit/releases) on y
 ```bash
 cargo install cargo-appimage
 cargo appimage
-./target/appimage/ayuz-1.1.1-1.AppImage
+./target/appimage/ayuz-1.1.2-1.AppImage
 ```
 
 ---
