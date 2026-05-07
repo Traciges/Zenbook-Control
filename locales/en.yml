@@ -342,7 +342,7 @@ animatrix_hardware_missing_warning: "This laptop does not have an AniMatrix pane
 # Fan FN+F shortcut
 fan_hotkey_enable_title: "FN + F shortcut"
 fan_hotkey_enable_subtitle: "Cycle fan profiles (Balanced → Performance → Whisper) when the fan key is pressed."
-fan_osd_show_title: "Show fan profile overlay"
-fan_osd_show_subtitle: "Display a brief on-screen indicator whenever the fan profile changes."
+fan_osd_enabled_title: "Show fan profile overlay"
+fan_osd_enabled_subtitle: "Display a brief on-screen indicator whenever the fan profile changes."
 fan_hotkey_listening: "FN+F fan-key listener active on \"%{device}\""
 error_fan_hotkey_no_device: "No ASUS hotkey input device found; FN+F fan-mode shortcut disabled."

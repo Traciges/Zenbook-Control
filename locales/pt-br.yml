@@ -342,7 +342,7 @@ animatrix_hardware_missing_warning: "Este laptop não possui painel AniMatrix. C
 # Fan FN+F shortcut
 fan_hotkey_enable_title: "Atalho FN + F"
 fan_hotkey_enable_subtitle: "Alternar perfis de ventoinha (Equilibrado → Desempenho → Sussurro) ao pressionar a tecla de ventoinha."
-fan_osd_show_title: "Mostrar sobreposição do perfil da ventoinha"
-fan_osd_show_subtitle: "Exibir um indicador rápido na tela sempre que o perfil da ventoinha mudar."
+fan_osd_enabled_title: "Mostrar sobreposição do perfil da ventoinha"
+fan_osd_enabled_subtitle: "Exibir um indicador rápido na tela sempre que o perfil da ventoinha mudar."
 fan_hotkey_listening: "Listener FN+F da tecla de ventoinha ativo em \"%{device}\""
 error_fan_hotkey_no_device: "Nenhum dispositivo de hotkey ASUS encontrado; atalho FN+F desativado."

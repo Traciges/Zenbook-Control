@@ -342,7 +342,7 @@ animatrix_hardware_missing_warning: "Dieser Laptop hat kein AniMatrix-Panel. Ste
 # Fan FN+F shortcut
 fan_hotkey_enable_title: "FN + F-Tastenkürzel"
 fan_hotkey_enable_subtitle: "Lüfterprofile durchschalten (Ausgewogen → Leistung → Flüstern), wenn die Lüfter-Taste gedrückt wird."
-fan_osd_show_title: "Lüfterprofil-Overlay anzeigen"
-fan_osd_show_subtitle: "Kurze Bildschirmanzeige einblenden, wenn das Lüfterprofil wechselt."
+fan_osd_enabled_title: "Lüfterprofil-Overlay anzeigen"
+fan_osd_enabled_subtitle: "Kurze Bildschirmanzeige einblenden, wenn das Lüfterprofil wechselt."
 fan_hotkey_listening: "FN+F Lüftertasten-Listener aktiv auf \"%{device}\""
 error_fan_hotkey_no_device: "Kein ASUS-Hotkey-Eingabegerät gefunden; FN+F-Lüfter-Tastenkürzel deaktiviert."

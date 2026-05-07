@@ -230,7 +230,7 @@ static SEARCH_INDEX: &[SearchItem] = &[
         component_key: "asus_key_hint",
     },
     SearchItem {
-        title_key: "fan_osd_show_title",
+        title_key: "fan_osd_enabled_title",
         page_icon: "input-keyboard-symbolic",
         page_title_key: "tab_keyboard",
         page_name: "keyboard",
