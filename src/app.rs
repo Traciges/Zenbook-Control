@@ -324,6 +324,11 @@ impl SimpleComponent for AppModel {
         let tray_handle = tray_svc.handle();
         tray_svc.spawn();
 
+        let fan_sender = fan.sender().clone();
+        let (_fan_hotkey_tx, fan_hotkey_rx) = tokio::sync::watch::channel(true);
+        tokio::spawn(crate::services::fan_hotkey::run(fan_sender, fan_hotkey_rx));
+        std::mem::forget(_fan_hotkey_tx);
+
         let toast_overlay = adw::ToastOverlay::new();
 
         let model = AppModel {
@@ -393,6 +398,29 @@ impl SimpleComponent for AppModel {
         asus_key_hint_row.set_title(&t!("asus_key_hint_row_title"));
         asus_key_hint_row.set_subtitle(&t!("asus_key_hint_row_subtitle"));
         asus_key_hint_group.add(&asus_key_hint_row);
+
+        let initial_cfg = crate::services::config::AppConfig::load();
+
+        let fan_hotkey_row = adw::SwitchRow::new();
+        fan_hotkey_row.set_title(&t!("fan_hotkey_enable_title"));
+        fan_hotkey_row.set_subtitle(&t!("fan_hotkey_enable_subtitle"));
+        fan_hotkey_row.set_active(initial_cfg.fan_hotkey_enabled);
+        fan_hotkey_row.connect_active_notify(|row| {
+            let active = row.is_active();
+            crate::services::config::AppConfig::update(|c| c.fan_hotkey_enabled = active);
+        });
+        asus_key_hint_group.add(&fan_hotkey_row);
+
+        let fan_osd_row = adw::SwitchRow::new();
+        fan_osd_row.set_title(&t!("fan_osd_show_title"));
+        fan_osd_row.set_subtitle(&t!("fan_osd_show_subtitle"));
+        fan_osd_row.set_active(initial_cfg.show_fan_osd);
+        fan_osd_row.connect_active_notify(|row| {
+            let active = row.is_active();
+            crate::services::config::AppConfig::update(|c| c.show_fan_osd = active);
+        });
+        asus_key_hint_group.add(&fan_osd_row);
+
         keyboard_page.add(&asus_key_hint_group);
 
         let touchpad_page = adw::PreferencesPage::new();

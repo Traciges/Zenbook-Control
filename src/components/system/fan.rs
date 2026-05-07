@@ -20,9 +20,20 @@ use relm4::adw::prelude::*;
 use relm4::prelude::*;
 use rust_i18n::t;
 
+use crate::components::system::fan_osd;
 use crate::services::config::AppConfig;
 use crate::services::dbus;
 use crate::services::dbus::FanProfile;
+
+/// Cycles Balanced → Performance → Quiet → Balanced. `LowPower` is treated as
+/// `Quiet` for cycling purposes (TUF laptops); the daemon falls back internally.
+fn next_profile(current: FanProfile) -> FanProfile {
+    match current {
+        FanProfile::Balanced => FanProfile::Performance,
+        FanProfile::Performance => FanProfile::Quiet,
+        FanProfile::Quiet | FanProfile::LowPower => FanProfile::Balanced,
+    }
+}
 
 /// State for the fan profile settings component.
 pub struct FanModel {
@@ -42,6 +53,8 @@ pub enum FanMsg {
     ChangeProfile(FanProfile),
     /// Apply a profile without saving (called when switching hardware profiles).
     LoadProfile(FanProfile),
+    /// Cycle to the next profile (triggered by the FN+F global hotkey).
+    CycleFromHotkey,
 }
 
 /// Async command results for the fan profile component.
@@ -199,6 +212,30 @@ impl Component for FanModel {
                         .drop_on_shutdown()
                 });
             }
+            FanMsg::CycleFromHotkey => {
+                if !self.asusd_available {
+                    return;
+                }
+                let target = next_profile(self.current_profile);
+                self.current_profile = target;
+                AppConfig::update(|c| c.active_profile_mut().fan_profile = target as u32);
+
+                self.check_performance.set_active(target == FanProfile::Performance);
+                self.check_balanced.set_active(target == FanProfile::Balanced);
+                self.check_quiet
+                    .set_active(target == FanProfile::Quiet || target == FanProfile::LowPower);
+
+                sender.command(move |out, shutdown| {
+                    shutdown
+                        .register(async move {
+                            match dbus::set_fan_profile(target).await {
+                                Ok(p) => out.emit(FanCommandOutput::ProfileSet(p)),
+                                Err(e) => out.emit(FanCommandOutput::Error(e)),
+                            }
+                        })
+                        .drop_on_shutdown()
+                });
+            }
             FanMsg::LoadProfile(profile) => {
                 if !self.asusd_available {
                     return;
@@ -241,6 +278,8 @@ impl Component for FanModel {
                     FanProfile::LowPower => "LowPower",
                 };
                 tracing::info!("{}", t!("fan_profile_set", profile = name));
+                self.current_profile = profile;
+                fan_osd::show(profile);
             }
             FanCommandOutput::Error(e) => {
                 let _ = sender.output(e);

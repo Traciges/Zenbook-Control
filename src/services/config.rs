@@ -69,6 +69,9 @@ fn default_animatrix_sleep_anim() -> String {
 fn default_animatrix_shutdown_anim() -> String {
     "GlitchOut".to_string()
 }
+fn default_true() -> bool {
+    true
+}
 
 fn generate_profile_id() -> String {
     use std::time::{SystemTime, UNIX_EPOCH};
@@ -207,6 +210,10 @@ pub struct AppConfig {
     pub language: String,
     #[serde(default)]
     pub skip_legacy_migration: bool,
+    #[serde(default = "default_true")]
+    pub show_fan_osd: bool,
+    #[serde(default = "default_true")]
+    pub fan_hotkey_enabled: bool,
 
     // ── Profile management ───────────────────────────────────────────────────
     #[serde(default)]
@@ -268,6 +275,8 @@ impl Default for AppConfig {
         Self {
             language: default_language(),
             skip_legacy_migration: false,
+            show_fan_osd: true,
+            fan_hotkey_enabled: true,
             active_profile_id: String::new(),
             profiles: vec![],
             // legacy defaults

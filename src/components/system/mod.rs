@@ -17,4 +17,5 @@
 pub mod apu_mem;
 pub mod battery;
 pub mod fan;
+pub mod fan_osd;
 pub mod gpu;

@@ -1,3 +1,15 @@
 .nav-separator {
     min-height: 2px;
 }
+
+.fan-osd {
+    background: alpha(@card_bg_color, 0.92);
+    border-radius: 18px;
+    box-shadow: 0 8px 32px alpha(black, 0.45);
+    padding: 4px 8px;
+}
+
+.fan-osd-label {
+    font-size: 1.1rem;
+    font-weight: 600;
+}

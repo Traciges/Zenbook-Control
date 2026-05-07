@@ -19,4 +19,5 @@ pub mod config;
 pub mod dbus;
 pub mod dbus_animatrix;
 pub mod edge_gestures;
+pub mod fan_hotkey;
 pub mod migration;

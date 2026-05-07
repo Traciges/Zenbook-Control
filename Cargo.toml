@@ -11,6 +11,7 @@ authors = ["Guido Philipp"]
 relm4 = { version = "0.10", features = ["libadwaita"] }
 libadwaita = { version = "0.8", features = ["v1_8"] }
 gtk4 = { version = "0.10", features = ["v4_14"] }
+gtk4-layer-shell = "0.6"
 zbus = { version = "5", default-features = false, features = ["tokio"] }
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "time", "sync", "process"] }
 serde = { version = "1", features = ["derive"] }
