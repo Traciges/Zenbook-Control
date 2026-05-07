@@ -23,7 +23,6 @@ use gtk4::prelude::*;
 use gtk4_layer_shell::{Edge, Layer, LayerShell};
 use rust_i18n::t;
 
-use crate::services::config::AppConfig;
 use crate::services::dbus::FanProfile;
 
 struct OsdState {
@@ -85,10 +84,11 @@ fn build() -> OsdState {
 /// Display a transient on-screen indicator showing the active fan profile.
 ///
 /// Auto-dismisses after 1.5 s. Subsequent calls reuse the same window and
-/// reset the dismiss timer. Honours the `show_fan_osd` config flag and
-/// silently no-ops when the GTK display is not yet initialised.
-pub fn show(profile: FanProfile) {
-    if !AppConfig::load().show_fan_osd {
+/// reset the dismiss timer. The caller is responsible for honouring the
+/// `fan_osd_enabled` user preference via `enabled`. No-ops silently when the
+/// GTK display is not yet initialised.
+pub fn show(profile: FanProfile, enabled: bool) {
+    if !enabled {
         return;
     }
     if gtk::gdk::Display::default().is_none() {

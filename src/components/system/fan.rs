@@ -279,7 +279,7 @@ impl Component for FanModel {
                 };
                 tracing::info!("{}", t!("fan_profile_set", profile = name));
                 self.current_profile = profile;
-                fan_osd::show(profile);
+                fan_osd::show(profile, AppConfig::load().fan_osd_enabled);
             }
             FanCommandOutput::Error(e) => {
                 let _ = sender.output(e);

@@ -325,9 +325,11 @@ impl SimpleComponent for AppModel {
         tray_svc.spawn();
 
         let fan_sender = fan.sender().clone();
-        let (_fan_hotkey_tx, fan_hotkey_rx) = tokio::sync::watch::channel(true);
+        let initial_fan_hotkey_enabled =
+            crate::services::config::AppConfig::load().fan_hotkey_enabled;
+        let (fan_hotkey_tx, fan_hotkey_rx) =
+            tokio::sync::watch::channel(initial_fan_hotkey_enabled);
         tokio::spawn(crate::services::fan_hotkey::run(fan_sender, fan_hotkey_rx));
-        std::mem::forget(_fan_hotkey_tx);
 
         let toast_overlay = adw::ToastOverlay::new();
 
@@ -405,19 +407,20 @@ impl SimpleComponent for AppModel {
         fan_hotkey_row.set_title(&t!("fan_hotkey_enable_title"));
         fan_hotkey_row.set_subtitle(&t!("fan_hotkey_enable_subtitle"));
         fan_hotkey_row.set_active(initial_cfg.fan_hotkey_enabled);
-        fan_hotkey_row.connect_active_notify(|row| {
+        fan_hotkey_row.connect_active_notify(move |row| {
             let active = row.is_active();
             crate::services::config::AppConfig::update(|c| c.fan_hotkey_enabled = active);
+            let _ = fan_hotkey_tx.send(active);
         });
         asus_key_hint_group.add(&fan_hotkey_row);
 
         let fan_osd_row = adw::SwitchRow::new();
-        fan_osd_row.set_title(&t!("fan_osd_show_title"));
-        fan_osd_row.set_subtitle(&t!("fan_osd_show_subtitle"));
-        fan_osd_row.set_active(initial_cfg.show_fan_osd);
+        fan_osd_row.set_title(&t!("fan_osd_enabled_title"));
+        fan_osd_row.set_subtitle(&t!("fan_osd_enabled_subtitle"));
+        fan_osd_row.set_active(initial_cfg.fan_osd_enabled);
         fan_osd_row.connect_active_notify(|row| {
             let active = row.is_active();
-            crate::services::config::AppConfig::update(|c| c.show_fan_osd = active);
+            crate::services::config::AppConfig::update(|c| c.fan_osd_enabled = active);
         });
         asus_key_hint_group.add(&fan_osd_row);
 
