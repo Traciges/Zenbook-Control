@@ -18,6 +18,8 @@ use rust_i18n::t;
 use serde::{Deserialize, Serialize};
 use zbus::zvariant::{OwnedValue, Type, Value};
 
+use super::dbus::system_bus_connection;
+
 // ── Hardware detection (DMI, no daemon required) ─────────────────────────────
 
 /// Which AniMatrix panel variant this machine has, detected from DMI board name.
@@ -160,12 +162,6 @@ trait Animatrix {
 
 static ANIMATRIX_PROXY: tokio::sync::OnceCell<AnimatrixProxy<'static>> =
     tokio::sync::OnceCell::const_new();
-
-async fn system_bus_connection() -> Result<zbus::Connection, String> {
-    zbus::Connection::system()
-        .await
-        .map_err(|e| t!("error_dbus_connect", error = e.to_string()).to_string())
-}
 
 async fn animatrix_proxy() -> Result<&'static AnimatrixProxy<'static>, String> {
     ANIMATRIX_PROXY

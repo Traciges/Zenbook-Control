@@ -68,7 +68,7 @@ static PLATFORM_PROXY: tokio::sync::OnceCell<PlatformProxy<'static>> =
     tokio::sync::OnceCell::const_new();
 
 /// Opens a system D-Bus connection, mapping errors to localised strings.
-async fn system_bus_connection() -> Result<zbus::Connection, String> {
+pub(crate) async fn system_bus_connection() -> Result<zbus::Connection, String> {
     zbus::Connection::system()
         .await
         .map_err(|e| t!("error_dbus_connect", error = e.to_string()).to_string())
