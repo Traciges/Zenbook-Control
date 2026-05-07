@@ -53,8 +53,8 @@ fn build() -> OsdState {
         window.init_layer_shell();
         window.set_layer(Layer::Overlay);
         window.set_namespace(Some("ayuz-osd"));
-        window.set_anchor(Edge::Top, true);
-        window.set_margin(Edge::Top, 80);
+        window.set_anchor(Edge::Bottom, true);
+        window.set_margin(Edge::Bottom, 80);
         window.set_keyboard_mode(gtk4_layer_shell::KeyboardMode::None);
     }
 
