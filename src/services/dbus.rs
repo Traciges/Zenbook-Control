@@ -339,14 +339,23 @@ pub async fn get_apu_mem_options() -> Result<Vec<i32>, String> {
 
 // ── Aura RGB keyboard lighting ───────────────────────────────────────────────
 
-use zbus::zvariant::{OwnedValue, Type, Value};
+use std::collections::BTreeMap;
+use serde::{Deserialize, Serialize};
+use zbus::zvariant::{ObjectPath, OwnedObjectPath, OwnedValue, Type, Value};
 
-/// Fallback lighting modes for TUF / single-zone keyboards (Static, Breathe, RainbowCycle,
-/// RainbowWave, Pulse). Sourced from `basic_modes` entries in rog-aura/data/aura_support.ron.
+/// Fallback lighting modes for TUF / single-zone keyboards when the daemon
+/// returns an empty `supported_basic_modes` list.
 pub const TUF_FALLBACK_MODES: &[u32] = &[0, 1, 2, 3, 10];
 
-/// `AuraDeviceType` discriminant for TUF laptops in asusd.
-const AURA_DEVICE_TYPE_TUF: u32 = 2;
+/// `AuraDeviceType` discriminants exposed by `xyz.ljones.Aura.device_type`.
+/// Matches the `AuraDeviceType` enum in `rog-aura/src/lib.rs`.
+pub const AURA_DEVICE_TYPE_LAPTOP_2021: u32 = 0;
+pub const AURA_DEVICE_TYPE_LAPTOP_PRE_2021: u32 = 1;
+pub const AURA_DEVICE_TYPE_TUF: u32 = 2;
+pub const AURA_DEVICE_TYPE_SCSI: u32 = 3;
+pub const AURA_DEVICE_TYPE_ALLY: u32 = 4;
+pub const AURA_DEVICE_TYPE_ANIME_OR_SLASH: u32 = 5;
+pub const AURA_DEVICE_TYPE_UNKNOWN: u32 = 255;
 
 /// Active lighting mode. Maps directly to the `AuraModeNum` discriminants in rog-aura.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -407,14 +416,153 @@ impl AuraModeNum {
     pub fn is_colour_irrelevant(self) -> bool {
         matches!(self, Self::RainbowCycle | Self::RainbowWave)
     }
+
+    /// Modes that use a configurable secondary colour. Mirrors `uses_colour2`
+    /// behaviour from `rog-aura/src/builtin_modes.rs`.
+    pub fn uses_colour2(self) -> bool {
+        matches!(
+            self,
+            Self::Breathe
+                | Self::Star
+                | Self::Highlight
+                | Self::Laser
+                | Self::Ripple
+                | Self::Pulse
+                | Self::Comet
+                | Self::Flash
+        )
+    }
+
+    /// Modes that respect the `speed` setting (animated effects).
+    pub fn uses_speed(self) -> bool {
+        !matches!(self, Self::Static)
+    }
+
+    /// Only the rainbow-wave mode uses `direction`.
+    pub fn uses_direction(self) -> bool {
+        matches!(self, Self::RainbowWave)
+    }
 }
 
 /// RGB colour triplet. D-Bus signature: `(yyy)`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Type, Value, OwnedValue)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Type, Value, OwnedValue, Serialize, Deserialize)]
 pub struct Colour {
     pub r: u8,
     pub g: u8,
     pub b: u8,
+}
+
+impl Colour {
+    pub const BLACK: Self = Self { r: 0, g: 0, b: 0 };
+}
+
+/// `AuraZone` discriminants exposed by `xyz.ljones.Aura.supported_basic_zones`.
+/// Wire signature: `u`. Matches `rog-aura::AuraZone`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u32)]
+pub enum AuraZone {
+    None = 0,
+    Key1 = 1,
+    Key2 = 2,
+    Key3 = 3,
+    Key4 = 4,
+    Logo = 5,
+    BarLeft = 6,
+    BarRight = 7,
+}
+
+impl From<u32> for AuraZone {
+    fn from(v: u32) -> Self {
+        match v {
+            1 => Self::Key1,
+            2 => Self::Key2,
+            3 => Self::Key3,
+            4 => Self::Key4,
+            5 => Self::Logo,
+            6 => Self::BarLeft,
+            7 => Self::BarRight,
+            _ => Self::None,
+        }
+    }
+}
+
+impl AuraZone {
+    pub fn i18n_key(self) -> &'static str {
+        match self {
+            Self::None => "aura_zone_none",
+            Self::Key1 => "aura_zone_key1",
+            Self::Key2 => "aura_zone_key2",
+            Self::Key3 => "aura_zone_key3",
+            Self::Key4 => "aura_zone_key4",
+            Self::Logo => "aura_zone_logo",
+            Self::BarLeft => "aura_zone_bar_left",
+            Self::BarRight => "aura_zone_bar_right",
+        }
+    }
+}
+
+/// `PowerZones` discriminants for `xyz.ljones.Aura.supported_power_zones` /
+/// `AuraPowerState.zone`. Wire signature: `u`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Type, Value, OwnedValue, Serialize, Deserialize)]
+#[repr(u32)]
+#[zvariant(signature = "u")]
+pub enum PowerZones {
+    Logo = 0,
+    Keyboard = 1,
+    Lightbar = 2,
+    Lid = 3,
+    RearGlow = 4,
+    KeyboardAndLightbar = 5,
+    Ally = 6,
+    None = 255,
+}
+
+impl From<u32> for PowerZones {
+    fn from(v: u32) -> Self {
+        match v {
+            0 => Self::Logo,
+            1 => Self::Keyboard,
+            2 => Self::Lightbar,
+            3 => Self::Lid,
+            4 => Self::RearGlow,
+            5 => Self::KeyboardAndLightbar,
+            6 => Self::Ally,
+            _ => Self::None,
+        }
+    }
+}
+
+impl PowerZones {
+    pub fn i18n_key(self) -> &'static str {
+        match self {
+            Self::Logo => "aura_power_zone_logo",
+            Self::Keyboard => "aura_power_zone_keyboard",
+            Self::Lightbar => "aura_power_zone_lightbar",
+            Self::Lid => "aura_power_zone_lid",
+            Self::RearGlow => "aura_power_zone_rear_glow",
+            Self::KeyboardAndLightbar => "aura_power_zone_keyboard_and_lightbar",
+            Self::Ally => "aura_power_zone_ally",
+            Self::None => "aura_power_zone_none",
+        }
+    }
+}
+
+/// Per-zone power-state struct. D-Bus signature follows `rog-aura::AuraPowerState`:
+/// `(ubbbb)` (zone u32, then four bools).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Type, Value, OwnedValue, Serialize, Deserialize)]
+pub struct AuraPowerState {
+    pub zone: PowerZones,
+    pub boot: bool,
+    pub awake: bool,
+    pub sleep: bool,
+    pub shutdown: bool,
+}
+
+/// Container struct sent to/from `xyz.ljones.Aura.led_power`. Wire signature:
+/// `(a(ubbbb))` — a single struct holding a `Vec<AuraPowerState>`.
+#[derive(Debug, Clone, PartialEq, Eq, Type, Value, OwnedValue, Serialize, Deserialize)]
+pub struct LaptopAuraPower {
+    pub states: Vec<AuraPowerState>,
 }
 
 /// Full Aura lighting effect sent to / read from `asusd`.
@@ -422,7 +570,7 @@ pub struct Colour {
 /// Uses `u32` for `mode`/`zone` and `String` for `speed`/`direction` to match
 /// the rog-aura D-Bus wire format without requiring custom zvariant signature
 /// attributes. Field order must exactly match the rog-aura `AuraEffect` struct.
-#[derive(Debug, Clone, Type, Value, OwnedValue)]
+#[derive(Debug, Clone, Type, Value, OwnedValue, Serialize, Deserialize)]
 pub struct AuraEffect {
     /// `AuraModeNum` discriminant (e.g. 0 = Static, 1 = Breathe).
     pub mode: u32,
@@ -438,14 +586,30 @@ pub struct AuraEffect {
 
 #[zbus::proxy(
     interface = "xyz.ljones.Aura",
-    default_service = "xyz.ljones.Asusd",
-    default_path = "/xyz/ljones/Aura"
+    default_service = "xyz.ljones.Asusd"
 )]
 trait Aura {
+    #[zbus(property)]
+    fn device_type(&self) -> zbus::Result<u32>;
+
+    #[zbus(property)]
+    fn supported_basic_modes(&self) -> zbus::Result<Vec<u32>>;
+    #[zbus(property)]
+    fn supported_basic_zones(&self) -> zbus::Result<Vec<u32>>;
+    #[zbus(property)]
+    fn supported_power_zones(&self) -> zbus::Result<Vec<u32>>;
+    #[zbus(property)]
+    fn supported_brightness(&self) -> zbus::Result<Vec<u32>>;
+
     #[zbus(property)]
     fn brightness(&self) -> zbus::Result<u32>;
     #[zbus(property)]
     fn set_brightness(&self, value: u32) -> zbus::Result<()>;
+
+    #[zbus(property)]
+    fn led_mode(&self) -> zbus::Result<u32>;
+    #[zbus(property)]
+    fn set_led_mode(&self, value: u32) -> zbus::Result<()>;
 
     #[zbus(property)]
     fn led_mode_data(&self) -> zbus::Result<AuraEffect>;
@@ -453,78 +617,173 @@ trait Aura {
     fn set_led_mode_data(&self, value: AuraEffect) -> zbus::Result<()>;
 
     #[zbus(property)]
-    fn supported_basic_modes(&self) -> zbus::Result<Vec<u32>>;
-
+    fn led_power(&self) -> zbus::Result<LaptopAuraPower>;
     #[zbus(property)]
-    fn device_type(&self) -> zbus::Result<u32>;
+    fn set_led_power(&self, value: LaptopAuraPower) -> zbus::Result<()>;
+
+    fn all_mode_data(&self) -> zbus::Result<BTreeMap<u32, AuraEffect>>;
 }
 
-/// Lazily-initialized singleton proxy to the `xyz.ljones.Aura` D-Bus object.
-static AURA_PROXY: tokio::sync::OnceCell<AuraProxy<'static>> = tokio::sync::OnceCell::const_new();
-
-/// Returns a reference to the shared [`AuraProxy`], initialising it on first call.
-async fn aura_proxy() -> Result<&'static AuraProxy<'static>, String> {
-    AURA_PROXY
-        .get_or_try_init(|| async {
-            let conn = system_bus_connection().await?;
-            AuraProxy::new(&conn)
-                .await
-                .map_err(|e| t!("error_dbus_proxy_create", error = e.to_string()).to_string())
-        })
+/// Builds an `AuraProxy` for a specific object path. Each call constructs a
+/// fresh proxy because Aura device paths are dynamic (e.g. `tuf`,
+/// `<product_id>_<num>_<devpath>`) — caching a single proxy would lock us to
+/// one device.
+async fn aura_proxy_for(path: &str) -> Result<AuraProxy<'static>, String> {
+    let conn = system_bus_connection().await?;
+    let object_path = ObjectPath::try_from(path.to_string())
+        .map_err(|e| t!("error_dbus_proxy_create", error = e.to_string()).to_string())?
+        .into_owned();
+    AuraProxy::builder(&conn)
+        .path(object_path)
+        .map_err(|e| t!("error_dbus_proxy_create", error = e.to_string()).to_string())?
+        .build()
         .await
+        .map_err(|e| t!("error_dbus_proxy_create", error = e.to_string()).to_string())
 }
 
-/// Describes the possible states of Aura RGB support on this system.
+/// Coarse classification used by the UI to label each Aura device.
+/// Derived from `device_type` plus the trailing path segment.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum AuraStatus {
-    /// `asusd` is running and the `xyz.ljones.Aura` interface is available (full Aura matrix).
-    Available,
-    /// `asusd` is running, `xyz.ljones.Aura` is registered, but the device is a
-    /// single-zone keyboard (DeviceType == 2). Only basic modes are supported.
-    SingleZoneAvailable,
-    /// `asusd` is running but this laptop has no Aura-capable keyboard.
-    HardwareNotSupported,
-    /// `asusd` is not installed or not running.
-    DaemonNotRunning,
+pub enum AuraDeviceKind {
+    /// USB-HID keyboard (LaptopKeyboard2021 / LaptopKeyboardPre2021).
+    Keyboard,
+    /// I2C-connected TUF keyboard (`/xyz/ljones/aura/tuf`). Single-zone.
+    KeyboardTuf,
+    /// AniMe matrix lid panel (`/xyz/ljones/aura/anime`).
+    AniMe,
+    /// ROG Slash strip (`/xyz/ljones/aura/slash`).
+    Slash,
+    /// External SCSI-attached LED device.
+    ScsiExt,
+    /// Asus Ally handheld.
+    Ally,
+    /// Anything else, including device_type == Unknown.
+    Other,
 }
 
-/// Detects Aura availability by probing the `xyz.ljones.Aura` interface directly.
-pub async fn check_aura_status() -> AuraStatus {
+impl AuraDeviceKind {
+    pub fn i18n_key(self) -> &'static str {
+        match self {
+            Self::Keyboard => "aura_device_keyboard",
+            Self::KeyboardTuf => "aura_device_keyboard_tuf",
+            Self::AniMe => "aura_device_anime",
+            Self::Slash => "aura_device_slash",
+            Self::ScsiExt => "aura_device_scsi",
+            Self::Ally => "aura_device_ally",
+            Self::Other => "aura_device_other",
+        }
+    }
+
+    /// True for kinds that the per-profile config should drive.
+    pub fn is_keyboard(self) -> bool {
+        matches!(self, Self::Keyboard | Self::KeyboardTuf)
+    }
+}
+
+fn classify_aura(device_type: u32, path: &str) -> AuraDeviceKind {
+    let suffix = path.rsplit('/').next().unwrap_or("");
+    match device_type {
+        AURA_DEVICE_TYPE_TUF => AuraDeviceKind::KeyboardTuf,
+        AURA_DEVICE_TYPE_LAPTOP_2021 | AURA_DEVICE_TYPE_LAPTOP_PRE_2021 => AuraDeviceKind::Keyboard,
+        AURA_DEVICE_TYPE_SCSI => AuraDeviceKind::ScsiExt,
+        AURA_DEVICE_TYPE_ALLY => AuraDeviceKind::Ally,
+        AURA_DEVICE_TYPE_ANIME_OR_SLASH => match suffix {
+            "anime" => AuraDeviceKind::AniMe,
+            "slash" => AuraDeviceKind::Slash,
+            _ => AuraDeviceKind::Other,
+        },
+        _ => match suffix {
+            "tuf" => AuraDeviceKind::KeyboardTuf,
+            "anime" => AuraDeviceKind::AniMe,
+            "slash" => AuraDeviceKind::Slash,
+            _ => AuraDeviceKind::Other,
+        },
+    }
+}
+
+/// Snapshot of one Aura device discovered on the bus.
+#[derive(Debug, Clone)]
+pub struct AuraDeviceInfo {
+    pub path: String,
+    pub kind: AuraDeviceKind,
+}
+
+/// Returns the daemon's running state. Re-uses [`PlatformProxy`] as a probe
+/// so a missing daemon and a daemon-without-Aura can be distinguished.
+pub async fn is_asusd_running() -> bool {
     let conn = match zbus::Connection::system().await {
         Ok(c) => c,
-        Err(_) => return AuraStatus::DaemonNotRunning,
+        Err(_) => return false,
     };
-
-    // Confirm asusd itself is on the bus before deciding the keyboard is unsupported.
-    match PlatformProxy::new(&conn).await {
-        Ok(p) if p.platform_profile().await.is_ok() => {}
-        _ => return AuraStatus::DaemonNotRunning,
-    }
-
-    let proxy = match AuraProxy::new(&conn).await {
-        Ok(p) => p,
-        Err(_) => return AuraStatus::HardwareNotSupported,
-    };
-
-    match proxy.device_type().await {
-        Ok(AURA_DEVICE_TYPE_TUF) => AuraStatus::SingleZoneAvailable,
-        Ok(_) => AuraStatus::Available,
-        Err(_) => AuraStatus::HardwareNotSupported,
-    }
+    matches!(
+        PlatformProxy::new(&conn).await,
+        Ok(p) if p.platform_profile().await.is_ok()
+    )
 }
 
-/// Reads the current keyboard LED brightness (0 = Off … 3 = High).
-pub async fn get_aura_brightness() -> Result<u32, String> {
-    let proxy = aura_proxy().await?;
+/// Enumerates every `xyz.ljones.Aura` object exported by `asusd` via
+/// `org.freedesktop.DBus.ObjectManager`. Returns an empty `Vec` when no
+/// keyboard / lightbar / LED hardware is registered.
+pub async fn discover_aura_devices() -> Result<Vec<AuraDeviceInfo>, String> {
+    let conn = system_bus_connection().await?;
+    let om = zbus::fdo::ObjectManagerProxy::builder(&conn)
+        .destination("xyz.ljones.Asusd")
+        .map_err(|e| t!("error_dbus_proxy_create", error = e.to_string()).to_string())?
+        .path("/")
+        .map_err(|e| t!("error_dbus_proxy_create", error = e.to_string()).to_string())?
+        .build()
+        .await
+        .map_err(|e| t!("error_dbus_proxy_create", error = e.to_string()).to_string())?;
+
+    let managed = om
+        .get_managed_objects()
+        .await
+        .map_err(|e| t!("error_aura_read", error = e.to_string()).to_string())?;
+
+    let mut out = Vec::new();
+    for (object_path, ifaces) in managed {
+        if !ifaces.contains_key("xyz.ljones.Aura") {
+            continue;
+        }
+        let path: OwnedObjectPath = object_path;
+        let path_str = path.as_str().to_string();
+        if !path_str.starts_with("/xyz/ljones/aura/") {
+            continue;
+        }
+        let device_type = match aura_proxy_for(&path_str).await {
+            Ok(p) => p.device_type().await.unwrap_or(AURA_DEVICE_TYPE_UNKNOWN),
+            Err(_) => AURA_DEVICE_TYPE_UNKNOWN,
+        };
+        let kind = classify_aura(device_type, &path_str);
+        out.push(AuraDeviceInfo {
+            path: path_str,
+            kind,
+        });
+    }
+    // Stable ordering: keyboards first, then lightbar/lid/anime/slash/other.
+    out.sort_by_key(|d| match d.kind {
+        AuraDeviceKind::Keyboard | AuraDeviceKind::KeyboardTuf => 0,
+        AuraDeviceKind::AniMe => 1,
+        AuraDeviceKind::Slash => 2,
+        AuraDeviceKind::Ally => 3,
+        AuraDeviceKind::ScsiExt => 4,
+        AuraDeviceKind::Other => 5,
+    });
+    Ok(out)
+}
+
+// ── Per-device Aura service functions ───────────────────────────────────────
+
+pub async fn get_aura_brightness(path: &str) -> Result<u32, String> {
+    let proxy = aura_proxy_for(path).await?;
     proxy
         .brightness()
         .await
         .map_err(|e| t!("error_aura_read", error = e.to_string()).to_string())
 }
 
-/// Sets the keyboard LED brightness and returns the applied value.
-pub async fn set_aura_brightness(value: u32) -> Result<u32, String> {
-    let proxy = aura_proxy().await?;
+pub async fn set_aura_brightness(path: &str, value: u32) -> Result<u32, String> {
+    let proxy = aura_proxy_for(path).await?;
     proxy
         .set_brightness(value)
         .await
@@ -532,29 +791,74 @@ pub async fn set_aura_brightness(value: u32) -> Result<u32, String> {
     Ok(value)
 }
 
-/// Reads the current full Aura lighting effect from `asusd`.
-pub async fn get_aura_effect() -> Result<AuraEffect, String> {
-    let proxy = aura_proxy().await?;
+pub async fn get_aura_effect(path: &str) -> Result<AuraEffect, String> {
+    let proxy = aura_proxy_for(path).await?;
     proxy
         .led_mode_data()
         .await
         .map_err(|e| t!("error_aura_read", error = e.to_string()).to_string())
 }
 
-/// Sends a new Aura lighting effect to `asusd` (sets mode, colour, speed, direction).
-pub async fn set_aura_effect(effect: AuraEffect) -> Result<(), String> {
-    let proxy = aura_proxy().await?;
+pub async fn set_aura_effect(path: &str, effect: AuraEffect) -> Result<(), String> {
+    let proxy = aura_proxy_for(path).await?;
     proxy
         .set_led_mode_data(effect)
         .await
         .map_err(|e| t!("error_aura_write", error = e.to_string()).to_string())
 }
 
-/// Returns the list of lighting modes that the keyboard hardware supports.
-pub async fn get_aura_supported_modes() -> Result<Vec<u32>, String> {
-    let proxy = aura_proxy().await?;
+pub async fn get_aura_supported_modes(path: &str) -> Result<Vec<u32>, String> {
+    let proxy = aura_proxy_for(path).await?;
     proxy
         .supported_basic_modes()
         .await
         .map_err(|e| t!("error_aura_read", error = e.to_string()).to_string())
+}
+
+pub async fn get_aura_supported_zones(path: &str) -> Result<Vec<u32>, String> {
+    let proxy = aura_proxy_for(path).await?;
+    proxy
+        .supported_basic_zones()
+        .await
+        .map_err(|e| t!("error_aura_read", error = e.to_string()).to_string())
+}
+
+pub async fn get_aura_supported_power_zones(path: &str) -> Result<Vec<u32>, String> {
+    let proxy = aura_proxy_for(path).await?;
+    proxy
+        .supported_power_zones()
+        .await
+        .map_err(|e| t!("error_aura_read", error = e.to_string()).to_string())
+}
+
+pub async fn get_aura_supported_brightness(path: &str) -> Result<Vec<u32>, String> {
+    let proxy = aura_proxy_for(path).await?;
+    proxy
+        .supported_brightness()
+        .await
+        .map_err(|e| t!("error_aura_read", error = e.to_string()).to_string())
+}
+
+pub async fn get_aura_all_mode_data(path: &str) -> Result<BTreeMap<u32, AuraEffect>, String> {
+    let proxy = aura_proxy_for(path).await?;
+    proxy
+        .all_mode_data()
+        .await
+        .map_err(|e| t!("error_aura_read", error = e.to_string()).to_string())
+}
+
+pub async fn get_aura_led_power(path: &str) -> Result<LaptopAuraPower, String> {
+    let proxy = aura_proxy_for(path).await?;
+    proxy
+        .led_power()
+        .await
+        .map_err(|e| t!("error_aura_read", error = e.to_string()).to_string())
+}
+
+pub async fn set_aura_led_power(path: &str, power: LaptopAuraPower) -> Result<(), String> {
+    let proxy = aura_proxy_for(path).await?;
+    proxy
+        .set_led_power(power)
+        .await
+        .map_err(|e| t!("error_aura_write", error = e.to_string()).to_string())
 }

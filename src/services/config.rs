@@ -35,6 +35,12 @@ fn default_aura_brightness() -> u32 {
 fn default_aura_colour_r() -> u8 {
     166
 }
+fn default_aura_speed() -> String {
+    "Med".to_string()
+}
+fn default_aura_direction() -> String {
+    "Right".to_string()
+}
 fn default_animatrix_enable() -> bool {
     true
 }
@@ -118,6 +124,18 @@ pub struct Profile {
     pub aura_colour_g: u8,
     #[serde(default)]
     pub aura_colour_b: u8,
+    #[serde(default)]
+    pub aura_zone: u32,
+    #[serde(default)]
+    pub aura_colour2_r: u8,
+    #[serde(default)]
+    pub aura_colour2_g: u8,
+    #[serde(default)]
+    pub aura_colour2_b: u8,
+    #[serde(default = "default_aura_speed")]
+    pub aura_speed: String,
+    #[serde(default = "default_aura_direction")]
+    pub aura_direction: String,
 
     // AniMatrix LED panel
     #[serde(default = "default_animatrix_enable")]
@@ -175,6 +193,12 @@ impl Default for Profile {
             aura_colour_r: 166,
             aura_colour_g: 0,
             aura_colour_b: 0,
+            aura_zone: 0,
+            aura_colour2_r: 0,
+            aura_colour2_g: 0,
+            aura_colour2_b: 0,
+            aura_speed: "Med".to_string(),
+            aura_direction: "Right".to_string(),
             animatrix_enable_display: true,
             animatrix_brightness: 2,
             animatrix_builtins_enabled: true,

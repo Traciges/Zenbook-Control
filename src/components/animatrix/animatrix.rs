@@ -430,7 +430,6 @@ impl Component for AnimatrixModel {
             .filter(|e| e.supports(hardware_type))
             .collect();
 
-        // Build brightness combo imperatively (same pattern as AuraModel)
         let br_off = t!("aura_brightness_off").to_string();
         let br_low = t!("aura_brightness_low").to_string();
         let br_med = t!("aura_brightness_med").to_string();

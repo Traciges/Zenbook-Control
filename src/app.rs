@@ -41,8 +41,8 @@ use crate::components::system::fan::FanMsg;
 use crate::components::system::gpu::GpuMsg;
 use crate::services::dbus::FanProfile;
 use crate::components::animatrix::{AnimatrixModel, AnimatrixMsg};
-use crate::components::aura::AuraModel;
-use crate::components::aura::AuraMsg;
+use crate::components::aura::AuraPageModel;
+use crate::components::aura::AuraPageMsg;
 use crate::components::keyboard::AutoBacklightModel;
 use crate::components::keyboard::BacklightIdleModel;
 use crate::components::keyboard::FnKeyModel;
@@ -122,7 +122,7 @@ pub struct AppModel {
     target_mode: Controller<TargetModeModel>,
     oled_care: Controller<OledCareModel>,
     color_gamut: Controller<ColorGamutModel>,
-    aura: Controller<AuraModel>,
+    aura: Controller<AuraPageModel>,
     animatrix: Controller<AnimatrixModel>,
     fn_key: Controller<FnKeyModel>,
     gestures: Controller<GesturesModel>,
@@ -218,12 +218,18 @@ impl SimpleComponent for AppModel {
                     ac_index: p.kbd_timeout_battery_ac_index,
                     battery_index: p.kbd_timeout_battery_only_index,
                 });
-                self.aura.sender().emit(AuraMsg::LoadProfile {
+                self.aura.sender().emit(AuraPageMsg::LoadProfile {
                     mode: p.aura_mode,
+                    zone: p.aura_zone,
                     brightness: p.aura_brightness,
                     colour_r: p.aura_colour_r,
                     colour_g: p.aura_colour_g,
                     colour_b: p.aura_colour_b,
+                    colour2_r: p.aura_colour2_r,
+                    colour2_g: p.aura_colour2_g,
+                    colour2_b: p.aura_colour2_b,
+                    speed: p.aura_speed.clone(),
+                    direction: p.aura_direction.clone(),
                 });
                 self.animatrix.sender().emit(AnimatrixMsg::LoadProfile {
                     enable_display: p.animatrix_enable_display,
@@ -308,7 +314,7 @@ impl SimpleComponent for AppModel {
         let target_mode = launch_component!(TargetModeModel, sender);
         let oled_care = launch_component!(OledCareModel, sender);
         let color_gamut = launch_component!(ColorGamutModel, sender);
-        let aura = launch_component!(AuraModel, sender);
+        let aura = launch_component!(AuraPageModel, sender);
         let animatrix = launch_component!(AnimatrixModel, sender);
         let fn_key = launch_component!(FnKeyModel, sender);
         let gestures = launch_component!(GesturesModel, sender);
@@ -385,9 +391,30 @@ impl SimpleComponent for AppModel {
         display_page.add(oled_care_widget);
         display_page.add(color_gamut_widget);
 
-        let aura_page = adw::PreferencesPage::new();
-        aura_page.add(aura_widget);
-        aura_page.add(animatrix_widget);
+        // Aura page hosts a Box of dynamic per-device PreferencesGroups
+        // (built by AuraPageModel) plus the Animatrix group. PreferencesPage
+        // can't host non-PreferencesGroup children directly, so we replicate
+        // its clamping/scrolling layout manually.
+        let aura_inner = gtk4::Box::builder()
+            .orientation(gtk4::Orientation::Vertical)
+            .spacing(24)
+            .margin_top(24)
+            .margin_bottom(24)
+            .margin_start(12)
+            .margin_end(12)
+            .build();
+        aura_inner.append(aura_widget);
+        aura_inner.append(animatrix_widget);
+        let aura_clamp = adw::Clamp::builder()
+            .maximum_size(600)
+            .tightening_threshold(400)
+            .child(&aura_inner)
+            .build();
+        let aura_page = gtk4::ScrolledWindow::builder()
+            .hscrollbar_policy(gtk4::PolicyType::Never)
+            .vexpand(true)
+            .child(&aura_clamp)
+            .build();
 
         let keyboard_page = adw::PreferencesPage::new();
         keyboard_page.add(auto_backlight_widget);

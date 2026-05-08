@@ -14,6 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see https://www.gnu.org/licenses/.
 
-pub mod aura;
-pub use aura::AuraModel;
-pub use aura::AuraMsg;
+pub mod aura_device;
+pub mod aura_page;
+
+pub use aura_page::{AuraPageModel, AuraPageMsg};
