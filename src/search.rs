@@ -23,11 +23,12 @@ use std::rc::Rc;
 const SCROLL_ANIMATION_DELAY_MS: u64 = 150;
 
 // (icon, i18n-key, stack-name)
-pub const NAV_ITEMS: [(&str, &str, &str); 7] = [
+pub const NAV_ITEMS: [(&str, &str, &str); 8] = [
     ("go-home-symbolic", "tab_home", "home"),
     ("video-display-symbolic", "tab_display", "display"),
     ("input-keyboard-symbolic", "tab_keyboard", "keyboard"),
     ("preferences-color-symbolic", "tab_aura", "aura"),
+    ("view-grid-symbolic", "tab_animatrix", "animatrix"),
     ("input-touchpad-symbolic", "tab_touchpad", "touchpad"),
     ("audio-headset-symbolic", "tab_audio", "audio"),
     ("preferences-system-symbolic", "tab_system", "system"),
@@ -153,30 +154,30 @@ static SEARCH_INDEX: &[SearchItem] = &[
     // AniMatrix
     SearchItem {
         title_key: "animatrix_group_title",
-        page_icon: "preferences-color-symbolic",
-        page_title_key: "tab_aura",
-        page_name: "aura",
+        page_icon: "view-grid-symbolic",
+        page_title_key: "tab_animatrix",
+        page_name: "animatrix",
         component_key: "animatrix",
     },
     SearchItem {
         title_key: "animatrix_enable_title",
-        page_icon: "preferences-color-symbolic",
-        page_title_key: "tab_aura",
-        page_name: "aura",
+        page_icon: "view-grid-symbolic",
+        page_title_key: "tab_animatrix",
+        page_name: "animatrix",
         component_key: "animatrix",
     },
     SearchItem {
         title_key: "animatrix_brightness_title",
-        page_icon: "preferences-color-symbolic",
-        page_title_key: "tab_aura",
-        page_name: "aura",
+        page_icon: "view-grid-symbolic",
+        page_title_key: "tab_animatrix",
+        page_name: "animatrix",
         component_key: "animatrix",
     },
     SearchItem {
         title_key: "animatrix_gallery_title",
-        page_icon: "preferences-color-symbolic",
-        page_title_key: "tab_aura",
-        page_name: "aura",
+        page_icon: "view-grid-symbolic",
+        page_title_key: "tab_animatrix",
+        page_name: "animatrix",
         component_key: "animatrix",
     },
     // Keyboard

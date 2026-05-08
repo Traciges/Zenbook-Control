@@ -74,6 +74,7 @@ enum AppPage {
     Display,
     Keyboard,
     Aura,
+    Animatrix,
     Touchpad,
     Audio,
     System,
@@ -87,6 +88,7 @@ impl AppPage {
             AppPage::Display => "display",
             AppPage::Keyboard => "keyboard",
             AppPage::Aura => "aura",
+            AppPage::Animatrix => "animatrix",
             AppPage::Touchpad => "touchpad",
             AppPage::Audio => "audio",
             AppPage::System => "system",
@@ -392,9 +394,8 @@ impl SimpleComponent for AppModel {
         display_page.add(color_gamut_widget);
 
         // Aura page hosts a Box of dynamic per-device PreferencesGroups
-        // (built by AuraPageModel) plus the Animatrix group. PreferencesPage
-        // can't host non-PreferencesGroup children directly, so we replicate
-        // its clamping/scrolling layout manually.
+        // (built by AuraPageModel). PreferencesPage can't host non-PreferencesGroup
+        // children directly, so we replicate its clamping/scrolling layout manually.
         let aura_inner = gtk4::Box::builder()
             .orientation(gtk4::Orientation::Vertical)
             .spacing(24)
@@ -404,7 +405,6 @@ impl SimpleComponent for AppModel {
             .margin_end(12)
             .build();
         aura_inner.append(aura_widget);
-        aura_inner.append(animatrix_widget);
         let aura_clamp = adw::Clamp::builder()
             .maximum_size(600)
             .tightening_threshold(400)
@@ -415,6 +415,9 @@ impl SimpleComponent for AppModel {
             .vexpand(true)
             .child(&aura_clamp)
             .build();
+
+        let animatrix_page = adw::PreferencesPage::new();
+        animatrix_page.add(animatrix_widget);
 
         let keyboard_page = adw::PreferencesPage::new();
         keyboard_page.add(auto_backlight_widget);
@@ -604,6 +607,7 @@ impl SimpleComponent for AppModel {
         content_stack.add_named(&display_page, Some(AppPage::Display.as_str()));
         content_stack.add_named(&keyboard_page, Some(AppPage::Keyboard.as_str()));
         content_stack.add_named(&aura_page, Some(AppPage::Aura.as_str()));
+        content_stack.add_named(&animatrix_page, Some(AppPage::Animatrix.as_str()));
         content_stack.add_named(&touchpad_page, Some(AppPage::Touchpad.as_str()));
         content_stack.add_named(&audio_page, Some(AppPage::Audio.as_str()));
         content_stack.add_named(&system_page, Some(AppPage::System.as_str()));
