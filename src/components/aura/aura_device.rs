@@ -25,8 +25,8 @@ use rust_i18n::t;
 
 use crate::services::config::AppConfig;
 use crate::services::dbus::{
-    self, AuraDeviceInfo, AuraDeviceKind, AuraEffect, AuraModeNum, AuraPowerState, AuraZone,
-    Colour, LaptopAuraPower, PowerZones, TUF_FALLBACK_MODES,
+    self, AuraDeviceInfo, AuraEffect, AuraModeNum, AuraPowerState, AuraZone, Colour,
+    LaptopAuraPower, PowerZones,
 };
 
 const SPEED_VALUES: &[&str] = &["Low", "Med", "High"];
@@ -302,10 +302,9 @@ impl Component for AuraDeviceModel {
         let widgets = view_output!();
 
         let path = info.path.clone();
-        let kind = info.kind;
         sender.command(move |out, shutdown| {
             shutdown
-                .register(async move { fetch_device_state(&path, kind, out).await })
+                .register(async move { fetch_device_state(&path, out).await })
                 .drop_on_shutdown()
         });
 
@@ -766,16 +765,8 @@ fn rgba_to_colour(r: RGBA) -> Colour {
     }
 }
 
-async fn fetch_device_state(
-    path: &str,
-    kind: AuraDeviceKind,
-    out: relm4::Sender<AuraDeviceCmd>,
-) {
-    let is_tuf = kind == AuraDeviceKind::KeyboardTuf;
-
+async fn fetch_device_state(path: &str, out: relm4::Sender<AuraDeviceCmd>) {
     let supported_modes = match dbus::get_aura_supported_modes(path).await {
-        Ok(v) if !v.is_empty() => v,
-        Ok(_) | Err(_) if is_tuf => TUF_FALLBACK_MODES.to_vec(),
         Ok(v) => v,
         Err(e) => {
             out.emit(AuraDeviceCmd::InitFailed(e));

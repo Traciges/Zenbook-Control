@@ -343,10 +343,6 @@ use std::collections::BTreeMap;
 use serde::{Deserialize, Serialize};
 use zbus::zvariant::{ObjectPath, OwnedObjectPath, OwnedValue, Type, Value};
 
-/// Fallback lighting modes for TUF / single-zone keyboards when the daemon
-/// returns an empty `supported_basic_modes` list.
-pub const TUF_FALLBACK_MODES: &[u32] = &[0, 1, 2, 3, 10];
-
 /// `AuraDeviceType` discriminants exposed by `xyz.ljones.Aura.device_type`.
 /// Matches the `AuraDeviceType` enum in `rog-aura/src/lib.rs`.
 pub const AURA_DEVICE_TYPE_LAPTOP_2021: u32 = 0;
