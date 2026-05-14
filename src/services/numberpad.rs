@@ -44,9 +44,9 @@ use evdev::uinput::VirtualDevice;
 use evdev::{
     AbsoluteAxisCode, AttributeSet, Device, EventSummary, InputEvent, KeyCode,
 };
-use tokio::sync::watch;
+use tokio::sync::{mpsc, watch};
 
-use crate::services::evdev_runner::open_event_stream;
+use crate::services::evdev_runner::{find_touchpad, open_event_stream, touchpad_abs_bounds};
 use crate::services::numberpad_layouts::{self, Layout};
 use crate::sys_paths::{DEV_UINPUT, PROC_BUS_INPUT_DEVICES, SYS_PRODUCT_NAME};
 
@@ -83,16 +83,15 @@ pub enum NumberpadStatus {
     PermissionDenied { device: String },
 }
 
-/// Information about the detected NumberPad-capable hardware.
-struct NumberpadHardware {
-    evdev_path: PathBuf,
-    i2c_path: PathBuf,
-    i2c_addr: u16,
-}
-
-/// Scans `/proc/bus/input/devices` for an ASUS-family touchpad and extracts
-/// the matching `/dev/i2c-N` bus. Returns `None` if no such device exists.
-fn detect_hardware() -> Option<NumberpadHardware> {
+/// Locates the `/dev/i2c-N` bus and the slave address for the ASUS-family
+/// touchpad on this system, by parsing `/proc/bus/input/devices`.
+///
+/// We can't derive this from the `evdev::Device` returned by
+/// `find_touchpad()` because the evdev API doesn't expose the device's
+/// underlying sysfs path. The two pieces of information come from different
+/// kernel surfaces, so we keep this private parser focused on the i2c side
+/// and let `find_touchpad()` handle the evdev side.
+fn detect_i2c_target() -> Option<(PathBuf, u16)> {
     let contents = fs::read_to_string(PROC_BUS_INPUT_DEVICES).ok()?;
 
     // A block in /proc/bus/input/devices is separated by blank lines and
@@ -100,18 +99,14 @@ fn detect_hardware() -> Option<NumberpadHardware> {
     //   I: Bus=0018 Vendor=04f3 Product=...
     //   N: Name="ASUE140D:00 04F3:319F Touchpad"
     //   S: Sysfs=/devices/pci0000:00/.../i2c-7/...
-    //   H: Handlers=mouse0 event7
     for block in contents.split("\n\n") {
         let mut name_line: Option<&str> = None;
         let mut sysfs_line: Option<&str> = None;
-        let mut handlers_line: Option<&str> = None;
         for line in block.lines() {
             if let Some(rest) = line.strip_prefix("N: ") {
                 name_line = Some(rest);
             } else if let Some(rest) = line.strip_prefix("S: ") {
                 sysfs_line = Some(rest);
-            } else if let Some(rest) = line.strip_prefix("H: ") {
-                handlers_line = Some(rest);
             }
         }
 
@@ -151,15 +146,7 @@ fn detect_hardware() -> Option<NumberpadHardware> {
         let bus = sysfs_line.and_then(parse_i2c_bus)?;
         let i2c_path = PathBuf::from(format!("/dev/i2c-{}", bus));
 
-        // Locate the eventN handler so we know which /dev/input/eventN to open.
-        let event_node = handlers_line.and_then(parse_event_handler)?;
-        let evdev_path = PathBuf::from(format!("/dev/input/{}", event_node));
-
-        return Some(NumberpadHardware {
-            evdev_path,
-            i2c_path,
-            i2c_addr,
-        });
+        return Some((i2c_path, i2c_addr));
     }
     None
 }
@@ -171,14 +158,6 @@ fn parse_i2c_bus(sysfs: &str) -> Option<u32> {
         .split('/')
         .filter_map(|seg| seg.strip_prefix("i2c-").and_then(|rest| rest.parse::<u32>().ok()))
         .next_back()
-}
-
-/// Extracts the `eventN` token from an `H: Handlers=...` line.
-fn parse_event_handler(handlers: &str) -> Option<String> {
-    handlers
-        .split_whitespace()
-        .find(|tok| tok.starts_with("event"))
-        .map(|s| s.to_string())
 }
 
 /// Verifies write access to the given path without modifying it.
@@ -195,16 +174,16 @@ fn is_writable(path: &Path) -> bool {
 /// Inspects the system to decide whether the NumberPad feature is available.
 /// Cheap enough to call on every UI start.
 pub async fn probe() -> NumberpadStatus {
-    let Some(hw) = detect_hardware() else {
+    let Some((i2c_path, _)) = detect_i2c_target() else {
         return NumberpadStatus::NoHardware;
     };
 
-    if !hw.i2c_path.exists() {
-        return NumberpadStatus::I2cUnavailable(hw.i2c_path.display().to_string());
+    if !i2c_path.exists() {
+        return NumberpadStatus::I2cUnavailable(i2c_path.display().to_string());
     }
-    if !is_writable(&hw.i2c_path) {
+    if !is_writable(&i2c_path) {
         return NumberpadStatus::PermissionDenied {
-            device: hw.i2c_path.display().to_string(),
+            device: i2c_path.display().to_string(),
         };
     }
     if !Path::new(DEV_UINPUT).exists() {
@@ -270,6 +249,25 @@ fn read_product_name() -> String {
         .unwrap_or_default()
 }
 
+/// Top-right corner activation zone. Tuned to match what a user can hit
+/// without precision: the rightmost 15 % horizontally and topmost 15 %
+/// vertically. Proportional - resilient to per-model touchpad dimensions.
+fn in_top_right_zone(x: i32, y: i32, x_max: i32, y_max: i32) -> bool {
+    (x as f64) > (x_max as f64) * 0.85 && (y as f64) < (y_max as f64) * 0.15
+}
+
+/// State of the corner-tap hold detector. `Tracking` means the finger is
+/// currently inside the top-right zone and the 1-second timer is armed.
+#[derive(Copy, Clone)]
+enum HoldTimer {
+    Idle,
+    Tracking { deadline: tokio::time::Instant },
+}
+
+/// How long the user must hold a finger in the top-right zone to trigger
+/// the activation flip.
+const HOLD_DURATION: std::time::Duration = std::time::Duration::from_millis(1000);
+
 /// Computes a cell index from a touch point. Returns `None` if either axis
 /// has zero range (defensive: would otherwise divide by zero) or the
 /// resulting cell has no key.
@@ -287,54 +285,30 @@ fn cell_for(x: i32, y: i32, x_max: i32, y_max: i32, layout: &Layout) -> Option<u
 
 /// Main NumberPad event loop. Spawn via `tokio::spawn`; exit by sending a
 /// new value on `shutdown`. `active_rx` flips Idle/Active without exiting.
+/// `feedback_tx` notifies the component when the active state was toggled
+/// from inside this loop (i.e. by the on-touchpad corner-tap gesture).
 pub async fn run_loop(
     mut shutdown: watch::Receiver<bool>,
     mut active_rx: watch::Receiver<bool>,
+    feedback_tx: mpsc::UnboundedSender<bool>,
 ) {
-    let Some(hw) = detect_hardware() else {
-        tracing::warn!("NumberPad: no hardware detected at run_loop start");
+    let Some((i2c_path, i2c_addr)) = detect_i2c_target() else {
+        tracing::warn!("NumberPad: no i2c target detected at run_loop start");
         return;
     };
 
-    let device = match Device::open(&hw.evdev_path) {
-        Ok(d) => d,
-        Err(e) => {
-            tracing::warn!(
-                "NumberPad: failed to open {}: {}",
-                hw.evdev_path.display(),
-                e
-            );
+    let device = match find_touchpad() {
+        Some(d) => d,
+        None => {
+            tracing::warn!("NumberPad: no touchpad evdev device found");
             return;
         }
     };
 
-    let abs_state = match device.get_abs_state() {
-        Ok(s) => s,
-        Err(e) => {
-            tracing::warn!("NumberPad: get_abs_state failed: {}", e);
-            return;
-        }
-    };
-    let x_max = {
-        let mt = abs_state[AbsoluteAxisCode::ABS_MT_POSITION_X.0 as usize].maximum;
-        if mt > 0 {
-            mt
-        } else {
-            abs_state[AbsoluteAxisCode::ABS_X.0 as usize].maximum
-        }
-    };
-    let y_max = {
-        let mt = abs_state[AbsoluteAxisCode::ABS_MT_POSITION_Y.0 as usize].maximum;
-        if mt > 0 {
-            mt
-        } else {
-            abs_state[AbsoluteAxisCode::ABS_Y.0 as usize].maximum
-        }
-    };
-    if x_max <= 0 || y_max <= 0 {
-        tracing::warn!("NumberPad: touchpad reported zero absolute range");
+    let Some((x_max, y_max)) = touchpad_abs_bounds(&device) else {
+        tracing::warn!("NumberPad: touchpad reported invalid absolute range");
         return;
-    }
+    };
 
     let layout = numberpad_layouts::for_product(&read_product_name());
 
@@ -355,10 +329,11 @@ pub async fn run_loop(
     let mut cur_x: i32 = 0;
     let mut cur_y: i32 = 0;
     let mut press_cell: Option<usize> = None;
+    let mut hold = HoldTimer::Idle;
 
     // Apply initial active state (LEDs + grab) if we entered Active immediately.
     if active {
-        apply_active_state(&hw, stream.device_mut(), true);
+        apply_active_state(&i2c_path, i2c_addr, stream.device_mut(), true);
     }
 
     loop {
@@ -370,9 +345,10 @@ pub async fn run_loop(
                 }
                 let new_active = *active_rx.borrow();
                 if new_active != active {
-                    apply_active_state(&hw, stream.device_mut(), new_active);
+                    apply_active_state(&i2c_path, i2c_addr, stream.device_mut(), new_active);
                     active = new_active;
                     press_cell = None;
+                    hold = HoldTimer::Idle;
                 }
             }
             ev = stream.next_event() => {
@@ -383,26 +359,34 @@ pub async fn run_loop(
                         break;
                     }
                 };
-                if !active {
-                    continue;
-                }
                 match event.destructure() {
                     EventSummary::Key(_, KeyCode::BTN_TOUCH, 1) => {
-                        // Finger went down. Latch the cell at press time so
-                        // dragging out of the cell does not change the emitted key.
-                        // TODO: corner-tap activation gesture goes here -
-                        // if !active and press is in top-right cell held > 1s,
-                        // flip the local `active` flag and persist via outer channel.
-                        press_cell = cell_for(cur_x, cur_y, x_max, y_max, layout);
+                        // Finger went down. Track the cell at press time (only
+                        // meaningful while Active) and arm the corner-tap hold
+                        // timer if the press lands in the top-right zone.
+                        if active {
+                            press_cell = cell_for(cur_x, cur_y, x_max, y_max, layout);
+                        }
+                        if in_top_right_zone(cur_x, cur_y, x_max, y_max) {
+                            hold = HoldTimer::Tracking {
+                                deadline: tokio::time::Instant::now() + HOLD_DURATION,
+                            };
+                        }
                     }
                     EventSummary::Key(_, KeyCode::BTN_TOUCH, 0) => {
-                        // Finger lifted. If still inside the original cell, emit.
-                        let release_cell = cell_for(cur_x, cur_y, x_max, y_max, layout);
-                        if let (Some(p), Some(r)) = (press_cell, release_cell)
-                            && p == r
-                            && let Some(cell) = layout.cells[p]
-                        {
-                            emit_tap(&mut virt, cell.key);
+                        // Finger lifted. Cancel any pending hold (fast taps in
+                        // the corner still emit normally via the cell logic
+                        // below because hold cancellation happens *before* the
+                        // gesture-fire branch could win the select).
+                        hold = HoldTimer::Idle;
+                        if active {
+                            let release_cell = cell_for(cur_x, cur_y, x_max, y_max, layout);
+                            if let (Some(p), Some(r)) = (press_cell, release_cell)
+                                && p == r
+                                && let Some(cell) = layout.cells[p]
+                            {
+                                emit_tap(&mut virt, cell.key);
+                            }
                         }
                         press_cell = None;
                     }
@@ -412,6 +396,11 @@ pub async fn run_loop(
                         value,
                     ) => {
                         cur_x = value;
+                        if matches!(hold, HoldTimer::Tracking { .. })
+                            && !in_top_right_zone(cur_x, cur_y, x_max, y_max)
+                        {
+                            hold = HoldTimer::Idle;
+                        }
                     }
                     EventSummary::AbsoluteAxis(
                         _,
@@ -419,9 +408,32 @@ pub async fn run_loop(
                         value,
                     ) => {
                         cur_y = value;
+                        if matches!(hold, HoldTimer::Tracking { .. })
+                            && !in_top_right_zone(cur_x, cur_y, x_max, y_max)
+                        {
+                            hold = HoldTimer::Idle;
+                        }
                     }
                     _ => {}
                 }
+            }
+            // Fourth branch: fires when the hold timer's deadline elapses.
+            // `std::future::pending` is the canonical "never resolves" future,
+            // used here so the branch is inert when no hold is in progress.
+            () = async {
+                match hold {
+                    HoldTimer::Tracking { deadline } => tokio::time::sleep_until(deadline).await,
+                    HoldTimer::Idle => std::future::pending::<()>().await,
+                }
+            } => {
+                let new_active = !active;
+                apply_active_state(&i2c_path, i2c_addr, stream.device_mut(), new_active);
+                active = new_active;
+                hold = HoldTimer::Idle;
+                // Suppress the cell emit that would otherwise fire on the
+                // upcoming BTN_TOUCH=0: the corner hold has consumed this touch.
+                press_cell = None;
+                let _ = feedback_tx.send(new_active);
             }
         }
     }
@@ -429,18 +441,18 @@ pub async fn run_loop(
     // Clean up: LEDs off, ungrab. Mirror the Idle transition regardless of
     // whichever state we were in when the shutdown fired.
     if active {
-        apply_active_state(&hw, stream.device_mut(), false);
+        apply_active_state(&i2c_path, i2c_addr, stream.device_mut(), false);
     }
 }
 
 /// Toggles LEDs (via I2C) and the evdev grab in tandem. Logs and continues on
 /// individual failures - a missing grab should not block LED toggling.
-fn apply_active_state(hw: &NumberpadHardware, device: &mut Device, active: bool) {
+fn apply_active_state(i2c_path: &Path, i2c_addr: u16, device: &mut Device, active: bool) {
     if active {
-        if let Err(e) = i2c_send(&hw.i2c_path, hw.i2c_addr, STATE_UNLOCK) {
+        if let Err(e) = i2c_send(i2c_path, i2c_addr, STATE_UNLOCK) {
             tracing::warn!("NumberPad: i2c unlock failed: {}", e);
         }
-        if let Err(e) = i2c_send(&hw.i2c_path, hw.i2c_addr, STATE_ENABLE) {
+        if let Err(e) = i2c_send(i2c_path, i2c_addr, STATE_ENABLE) {
             tracing::warn!("NumberPad: i2c enable failed: {}", e);
         }
         if let Err(e) = device.grab() {
@@ -450,7 +462,7 @@ fn apply_active_state(hw: &NumberpadHardware, device: &mut Device, active: bool)
         if let Err(e) = device.ungrab() {
             tracing::warn!("NumberPad: evdev ungrab failed: {}", e);
         }
-        if let Err(e) = i2c_send(&hw.i2c_path, hw.i2c_addr, STATE_DISABLE) {
+        if let Err(e) = i2c_send(i2c_path, i2c_addr, STATE_DISABLE) {
             tracing::warn!("NumberPad: i2c disable failed: {}", e);
         }
     }

@@ -18,7 +18,7 @@ use relm4::adw;
 use relm4::adw::prelude::*;
 use relm4::prelude::*;
 use rust_i18n::t;
-use tokio::sync::watch;
+use tokio::sync::{mpsc, watch};
 
 use crate::services::config::AppConfig;
 use crate::services::numberpad::{self, NumberpadStatus};
@@ -50,6 +50,9 @@ pub enum NumberpadMsg {
     LoadProfile(bool),
     /// Runtime toggle (CLI / future gesture). Flips Active/Idle.
     ToggleActive,
+    /// One-way feedback from the backend loop: the on-touchpad corner-tap
+    /// gesture flipped the active state, the UI needs to catch up.
+    SyncActive(bool),
 }
 
 #[relm4::component(pub)]
@@ -123,7 +126,7 @@ impl Component for NumberpadModel {
         ComponentParts { model, widgets }
     }
 
-    fn update(&mut self, msg: NumberpadMsg, _sender: ComponentSender<Self>, _root: &Self::Root) {
+    fn update(&mut self, msg: NumberpadMsg, sender: ComponentSender<Self>, _root: &Self::Root) {
         match msg {
             NumberpadMsg::Probed(status) => {
                 self.status_label.set_label(&status_message(&status));
@@ -136,7 +139,7 @@ impl Component for NumberpadModel {
                     return;
                 }
                 if self.enabled && self.shutdown_tx.is_none() {
-                    self.spawn_service();
+                    self.spawn_service(&sender);
                 }
             }
             NumberpadMsg::Toggle(active) => {
@@ -149,7 +152,7 @@ impl Component for NumberpadModel {
                     return;
                 }
                 if active {
-                    self.spawn_service();
+                    self.spawn_service(&sender);
                 } else {
                     self.stop_service();
                 }
@@ -160,7 +163,7 @@ impl Component for NumberpadModel {
                     return;
                 }
                 if active && self.shutdown_tx.is_none() {
-                    self.spawn_service();
+                    self.spawn_service(&sender);
                 } else if !active && self.shutdown_tx.is_some() {
                     self.stop_service();
                 }
@@ -174,6 +177,14 @@ impl Component for NumberpadModel {
                 if let Some(tx) = &self.active_tx {
                     let _ = tx.send(self.active);
                 }
+            }
+            NumberpadMsg::SyncActive(b) => {
+                // Gesture-originated toggle: the run_loop has *already* applied
+                // the new state internally. We only update local state here;
+                // pushing back on `active_tx` would be a redundant no-op (the
+                // value already matches) and conceptually wrong - the loop is
+                // already the source of truth for this flip.
+                self.active = b;
             }
         }
     }
@@ -189,10 +200,22 @@ impl Component for NumberpadModel {
 }
 
 impl NumberpadModel {
-    fn spawn_service(&mut self) {
+    fn spawn_service(&mut self, sender: &ComponentSender<Self>) {
         let (shutdown_tx, shutdown_rx) = watch::channel(false);
         let (active_tx, active_rx) = watch::channel(self.active);
-        tokio::spawn(numberpad::run_loop(shutdown_rx, active_rx));
+        let (feedback_tx, mut feedback_rx) = mpsc::unbounded_channel();
+        tokio::spawn(numberpad::run_loop(shutdown_rx, active_rx, feedback_tx));
+
+        // Relay gesture-originated toggles back into the component's message
+        // loop. Terminates automatically when `feedback_tx` is dropped at the
+        // end of `run_loop`, which happens on shutdown.
+        let relay_sender = sender.clone();
+        tokio::spawn(async move {
+            while let Some(b) = feedback_rx.recv().await {
+                relay_sender.input(NumberpadMsg::SyncActive(b));
+            }
+        });
+
         self.shutdown_tx = Some(shutdown_tx);
         self.active_tx = Some(active_tx);
     }
