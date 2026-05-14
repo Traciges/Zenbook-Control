@@ -14,11 +14,11 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see https://www.gnu.org/licenses/.
 
-use evdev::{AbsoluteAxisCode, Device, EventSummary, KeyCode};
+use evdev::{AbsoluteAxisCode, EventSummary, KeyCode};
 use rust_i18n::t;
 use tokio::sync::watch;
 
-use crate::services::evdev_runner::open_event_stream;
+use crate::services::evdev_runner::{find_touchpad, open_event_stream, touchpad_abs_bounds};
 
 /// Fraction of touchpad width/height that counts as an edge zone (4%)
 const EDGE_PERCENT: f64 = 0.04;
@@ -64,28 +64,6 @@ fn try_classify(state: &mut GestureState, left: i32, right: i32, top: i32) {
     }
 }
 
-/// Scans `/dev/input/` for the first device whose name contains "touchpad"
-/// and that reports both `ABS_X` and `ABS_Y` absolute axes.
-fn find_touchpad() -> Option<Device> {
-    for (_, device) in evdev::enumerate() {
-        let name = device.name().unwrap_or_default().to_lowercase();
-        if !name.contains("touchpad") {
-            continue;
-        }
-        let supported = device.supported_absolute_axes();
-        if let Some(axes) = supported {
-            if (axes.contains(AbsoluteAxisCode::ABS_X)
-                || axes.contains(AbsoluteAxisCode::ABS_MT_POSITION_X))
-                && (axes.contains(AbsoluteAxisCode::ABS_Y)
-                    || axes.contains(AbsoluteAxisCode::ABS_MT_POSITION_Y))
-            {
-                return Some(device);
-            }
-        }
-    }
-    None
-}
-
 /// Spawns an external program asynchronously to perform a gesture action.
 ///
 /// Failures are logged as warnings but do not propagate - this is a fire-and-forget call.
@@ -124,28 +102,9 @@ pub async fn run_gesture_loop(mut shutdown: watch::Receiver<bool>) {
         }
     };
 
-    let abs_state = match device.get_abs_state() {
-        Ok(states) => states,
-        Err(e) => {
-            tracing::warn!("{}", t!("error_abs_info", error = e.to_string()));
-            return;
-        }
-    };
-    let x_max = {
-        let legacy = abs_state[AbsoluteAxisCode::ABS_X.0 as usize].maximum;
-        if legacy > 0 {
-            legacy
-        } else {
-            abs_state[AbsoluteAxisCode::ABS_MT_POSITION_X.0 as usize].maximum
-        }
-    };
-    let y_max = {
-        let legacy = abs_state[AbsoluteAxisCode::ABS_Y.0 as usize].maximum;
-        if legacy > 0 {
-            legacy
-        } else {
-            abs_state[AbsoluteAxisCode::ABS_MT_POSITION_Y.0 as usize].maximum
-        }
+    let (x_max, y_max) = match touchpad_abs_bounds(&device) {
+        Some(b) => b,
+        None => return,
     };
     let left_bound = (x_max as f64 * EDGE_PERCENT) as i32;
     let right_bound = (x_max as f64 * (1.0 - EDGE_PERCENT)) as i32;

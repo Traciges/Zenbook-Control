@@ -15,10 +15,11 @@
 // along with this program.  If not, see https://www.gnu.org/licenses/.
 
 //! Shared helpers for evdev-based listener services (`fan_hotkey`,
-//! `edge_gestures`). Device enumeration criteria differ per consumer, but the
-//! stream-open + error logging boilerplate is identical.
+//! `edge_gestures`, `numberpad`). Device enumeration criteria are common
+//! enough that consumers share them; per-consumer behaviour lives in the
+//! callers.
 
-use evdev::{Device, EventStream};
+use evdev::{AbsoluteAxisCode, Device, EventStream};
 use rust_i18n::t;
 
 /// Converts a [`Device`] into an [`EventStream`], logging a warning and
@@ -31,4 +32,58 @@ pub fn open_event_stream(device: Device) -> Option<EventStream> {
             None
         }
     }
+}
+
+/// Scans `/dev/input/` for the first device whose name contains "touchpad"
+/// and that reports both an X and Y absolute axis (either legacy `ABS_X/Y`
+/// or multi-touch `ABS_MT_POSITION_X/Y`).
+pub fn find_touchpad() -> Option<Device> {
+    for (_, device) in evdev::enumerate() {
+        let name = device.name().unwrap_or_default().to_lowercase();
+        if !name.contains("touchpad") {
+            continue;
+        }
+        if let Some(axes) = device.supported_absolute_axes()
+            && (axes.contains(AbsoluteAxisCode::ABS_X)
+                || axes.contains(AbsoluteAxisCode::ABS_MT_POSITION_X))
+            && (axes.contains(AbsoluteAxisCode::ABS_Y)
+                || axes.contains(AbsoluteAxisCode::ABS_MT_POSITION_Y))
+        {
+            return Some(device);
+        }
+    }
+    None
+}
+
+/// Reads the touchpad's absolute axis bounds. Prefers multi-touch
+/// (`ABS_MT_POSITION_*`) and falls back to legacy (`ABS_X/Y`). Returns
+/// `None` when either axis is missing or reports a non-positive maximum.
+pub fn touchpad_abs_bounds(device: &Device) -> Option<(i32, i32)> {
+    let abs_state = match device.get_abs_state() {
+        Ok(s) => s,
+        Err(e) => {
+            tracing::warn!("{}", t!("error_abs_info", error = e.to_string()));
+            return None;
+        }
+    };
+    let x_max = {
+        let mt = abs_state[AbsoluteAxisCode::ABS_MT_POSITION_X.0 as usize].maximum;
+        if mt > 0 {
+            mt
+        } else {
+            abs_state[AbsoluteAxisCode::ABS_X.0 as usize].maximum
+        }
+    };
+    let y_max = {
+        let mt = abs_state[AbsoluteAxisCode::ABS_MT_POSITION_Y.0 as usize].maximum;
+        if mt > 0 {
+            mt
+        } else {
+            abs_state[AbsoluteAxisCode::ABS_Y.0 as usize].maximum
+        }
+    };
+    if x_max <= 0 || y_max <= 0 {
+        return None;
+    }
+    Some((x_max, y_max))
 }
