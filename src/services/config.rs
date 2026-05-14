@@ -107,6 +107,8 @@ pub struct Profile {
     pub touchpad_active: bool,
     pub input_gestures_active: bool,
     pub input_fn_key_locked: bool,
+    #[serde(default)]
+    pub numberpad_active: bool,
 
     // System
     pub battery_deep_sleep_active: bool,
@@ -185,6 +187,7 @@ impl Default for Profile {
             touchpad_active: true,
             input_gestures_active: false,
             input_fn_key_locked: false,
+            numberpad_active: false,
             battery_deep_sleep_active: false,
             gpu_mode: 0,
             apu_mem: 0,

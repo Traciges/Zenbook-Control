@@ -19,3 +19,6 @@ pub use gestures::GesturesModel;
 
 pub mod touchpad;
 pub use touchpad::TouchpadModel;
+
+pub mod numberpad;
+pub use numberpad::NumberpadModel;

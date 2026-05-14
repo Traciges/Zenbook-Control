@@ -52,8 +52,30 @@ fn main() {
     // We read --hidden ourselves first, then strip it from the args before passing
     // them to GTK via .with_args().
     let args: Vec<String> = std::env::args().collect();
+
+    // Single-instance IPC: if invoked with `--toggle-numberpad`, do not
+    // launch a second GTK app. Instead connect to the already-running Ayuz
+    // via its abstract Unix socket and request a NumberPad Active/Idle flip.
+    if args.iter().any(|arg| arg == "--toggle-numberpad") {
+        if let Some(addr) = app::abstract_socket_addr("ayuz-numberpad") {
+            use std::io::Write;
+            match std::os::unix::net::UnixStream::connect_addr(&addr) {
+                Ok(mut s) => {
+                    let _ = s.write_all(&[1]);
+                }
+                Err(e) => {
+                    eprintln!("ayuz: --toggle-numberpad: no running instance: {}", e);
+                }
+            }
+        }
+        return;
+    }
+
     let start_hidden = args.iter().any(|arg| arg == "--hidden");
-    let gtk_args: Vec<String> = args.into_iter().filter(|arg| arg != "--hidden").collect();
+    let gtk_args: Vec<String> = args
+        .into_iter()
+        .filter(|arg| arg != "--hidden" && arg != "--toggle-numberpad")
+        .collect();
 
     gtk4::glib::set_prgname(Some("de.guido.ayuz"));
     let a = relm4::RelmApp::new("de.guido.ayuz").with_args(gtk_args);

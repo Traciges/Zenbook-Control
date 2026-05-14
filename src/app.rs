@@ -34,6 +34,7 @@ use crate::components::keyboard::auto_backlight::AutoBacklightMsg;
 use crate::components::keyboard::backlight_idle::BacklightIdleMsg;
 use crate::components::keyboard::fn_key::FnKeyMsg;
 use crate::components::touchpad::gestures::GesturesMsg;
+use crate::components::touchpad::numberpad::NumberpadMsg;
 use crate::components::touchpad::touchpad::TouchpadMsg;
 use crate::components::system::apu_mem::ApuMemMsg;
 use crate::components::system::battery::BatteryMsg;
@@ -47,6 +48,7 @@ use crate::components::keyboard::AutoBacklightModel;
 use crate::components::keyboard::BacklightIdleModel;
 use crate::components::keyboard::FnKeyModel;
 use crate::components::touchpad::GesturesModel;
+use crate::components::touchpad::NumberpadModel;
 use crate::components::touchpad::TouchpadModel;
 use crate::components::system::apu_mem::ApuMemModel;
 use crate::components::system::battery::BatteryModel;
@@ -59,6 +61,16 @@ use relm4::adw::prelude::*;
 use relm4::prelude::*;
 use rust_i18n::t;
 use std::rc::Rc;
+
+/// Builds a Linux *abstract* (per-user-namespace) Unix socket address with the
+/// given name. Returns None on non-Linux platforms where abstract sockets
+/// are unsupported. Abstract addresses live in a separate namespace, do not
+/// touch the filesystem, and are cleaned up automatically when the process
+/// exits - exactly what we want for a tiny CLI -> running-GUI handshake.
+pub(crate) fn abstract_socket_addr(name: &str) -> Option<std::os::unix::net::SocketAddr> {
+    use std::os::linux::net::SocketAddrExt;
+    std::os::unix::net::SocketAddr::from_abstract_name(name).ok()
+}
 
 macro_rules! launch_component {
     ($type:ty, $sender:expr) => {
@@ -128,6 +140,7 @@ pub struct AppModel {
     animatrix: Controller<AnimatrixModel>,
     fn_key: Controller<FnKeyModel>,
     gestures: Controller<GesturesModel>,
+    numberpad: Controller<NumberpadModel>,
     touchpad: Controller<TouchpadModel>,
     auto_backlight: Controller<AutoBacklightModel>,
     backlight_idle: Controller<BacklightIdleModel>,
@@ -247,6 +260,7 @@ impl SimpleComponent for AppModel {
                 });
                 self.touchpad.sender().emit(TouchpadMsg::LoadProfile(p.touchpad_active));
                 self.gestures.sender().emit(GesturesMsg::LoadProfile(p.input_gestures_active));
+                self.numberpad.sender().emit(NumberpadMsg::LoadProfile(p.numberpad_active));
                 self.fn_key.sender().emit(FnKeyMsg::LoadProfile(p.input_fn_key_locked));
 
                 // System
@@ -320,6 +334,7 @@ impl SimpleComponent for AppModel {
         let animatrix = launch_component!(AnimatrixModel, sender);
         let fn_key = launch_component!(FnKeyModel, sender);
         let gestures = launch_component!(GesturesModel, sender);
+        let numberpad = launch_component!(NumberpadModel, sender);
         let touchpad = launch_component!(TouchpadModel, sender);
         let auto_backlight = launch_component!(AutoBacklightModel, sender);
         let backlight_idle = launch_component!(BacklightIdleModel, sender);
@@ -338,6 +353,43 @@ impl SimpleComponent for AppModel {
         let (fan_hotkey_tx, fan_hotkey_rx) =
             tokio::sync::watch::channel(initial_fan_hotkey_enabled);
         tokio::spawn(crate::services::fan_hotkey::run(fan_sender, fan_hotkey_rx));
+
+        // Abstract Unix socket listener for `ayuz --toggle-numberpad`. The
+        // CLI short-circuit in main.rs connects to "\0ayuz-numberpad" and
+        // writes one byte; each byte received here flips the NumberPad
+        // Active/Idle state at runtime without re-launching the GUI.
+        let numberpad_sender = numberpad.sender().clone();
+        tokio::spawn(async move {
+            use tokio::io::AsyncReadExt;
+            use tokio::net::UnixListener;
+            let addr = match abstract_socket_addr("ayuz-numberpad") {
+                Some(a) => a,
+                None => return,
+            };
+            let listener = match std::os::unix::net::UnixListener::bind_addr(&addr)
+                .and_then(|s| { s.set_nonblocking(true)?; Ok(s) })
+                .and_then(UnixListener::from_std)
+            {
+                Ok(l) => l,
+                Err(e) => {
+                    tracing::warn!("NumberPad IPC: failed to bind socket: {}", e);
+                    return;
+                }
+            };
+            loop {
+                match listener.accept().await {
+                    Ok((mut stream, _)) => {
+                        let mut buf = [0u8; 1];
+                        if stream.read_exact(&mut buf).await.is_ok() {
+                            numberpad_sender.emit(NumberpadMsg::ToggleActive);
+                        }
+                    }
+                    Err(e) => {
+                        tracing::warn!("NumberPad IPC: accept failed: {}", e);
+                    }
+                }
+            }
+        });
 
         let toast_overlay = adw::ToastOverlay::new();
 
@@ -359,6 +411,7 @@ impl SimpleComponent for AppModel {
             animatrix,
             fn_key,
             gestures,
+            numberpad,
             touchpad,
             auto_backlight,
             backlight_idle,
@@ -379,6 +432,7 @@ impl SimpleComponent for AppModel {
         let animatrix_widget = model.animatrix.widget();
         let fn_key_widget = model.fn_key.widget();
         let gestures_widget = model.gestures.widget();
+        let numberpad_widget = model.numberpad.widget();
         let touchpad_widget = model.touchpad.widget();
         let auto_backlight_widget = model.auto_backlight.widget();
         let backlight_idle_widget = model.backlight_idle.widget();
@@ -458,6 +512,7 @@ impl SimpleComponent for AppModel {
 
         let touchpad_page = adw::PreferencesPage::new();
         touchpad_page.add(touchpad_widget);
+        touchpad_page.add(numberpad_widget);
         touchpad_page.add(gestures_widget);
 
         let audio_page = adw::PreferencesPage::new();
@@ -577,6 +632,7 @@ impl SimpleComponent for AppModel {
             ),
             ("fn_key", fn_key_widget.clone().upcast::<gtk4::Widget>()),
             ("gestures", gestures_widget.clone().upcast::<gtk4::Widget>()),
+            ("numberpad", numberpad_widget.clone().upcast::<gtk4::Widget>()),
             ("touchpad", touchpad_widget.clone().upcast::<gtk4::Widget>()),
             ("volume", volume_widget.clone().upcast::<gtk4::Widget>()),
             (

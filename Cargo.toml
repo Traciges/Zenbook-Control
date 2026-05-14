@@ -20,6 +20,7 @@ directories = "6"
 futures-util = "0.3"
 ksni = "0.2"
 evdev = { version = "0.13.2", features = ["tokio"] }
+libc = "0.2"
 rust-i18n = "3"
 image = { version = "0.25", default-features = false, features = ["png"] }
 rog_anime = { version = "1", default-features = false }
@@ -39,6 +40,7 @@ assets = [
     ["packaging/de.guido.ayuz.metainfo.xml", "usr/share/metainfo/", "644"],
     ["assets/trayicon.png", "usr/share/icons/hicolor/128x128/apps/de.guido.ayuz.png", "644"],
     ["assets/anime/**/*.gif", "usr/share/ayuz/anime/", "644"],
+    ["packaging/udev/99-ayuz-numberpad.rules", "usr/lib/udev/rules.d/99-ayuz-numberpad.rules", "644"],
 ]
 
 [package.metadata.generate-rpm]
@@ -47,7 +49,8 @@ assets = [
     { source = "packaging/de.guido.ayuz.desktop", dest = "/usr/share/applications/de.guido.ayuz.desktop", mode = "644" },
     { source = "packaging/de.guido.ayuz.metainfo.xml", dest = "/usr/share/metainfo/de.guido.ayuz.metainfo.xml", mode = "644" },
     { source = "assets/trayicon.png", dest = "/usr/share/icons/hicolor/128x128/apps/de.guido.ayuz.png", mode = "644" },
-    { source = "assets/anime/**/*.gif", dest = "/usr/share/ayuz/anime/", mode = "644" }
+    { source = "assets/anime/**/*.gif", dest = "/usr/share/ayuz/anime/", mode = "644" },
+    { source = "packaging/udev/99-ayuz-numberpad.rules", dest = "/usr/lib/udev/rules.d/99-ayuz-numberpad.rules", mode = "644" }
 ]
 
 [package.metadata.appimage]

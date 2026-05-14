@@ -252,6 +252,20 @@ static SEARCH_INDEX: &[SearchItem] = &[
         page_name: "touchpad",
         component_key: "touchpad",
     },
+    SearchItem {
+        title_key: "numberpad_group_title",
+        page_icon: "input-touchpad-symbolic",
+        page_title_key: "tab_touchpad",
+        page_name: "touchpad",
+        component_key: "numberpad",
+    },
+    SearchItem {
+        title_key: "numberpad_enable_title",
+        page_icon: "input-touchpad-symbolic",
+        page_title_key: "tab_touchpad",
+        page_name: "touchpad",
+        component_key: "numberpad",
+    },
     // Audio
     SearchItem {
         title_key: "volume_booster_title",

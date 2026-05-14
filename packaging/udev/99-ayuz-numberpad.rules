@@ -1,0 +1,11 @@
+# Ayuz NumberPad - grant userland access to the kernel facilities the
+# in-app driver needs:
+#   * /dev/uinput   - to create the virtual keyboard that emits KEY_KP0..
+#                     KEY_KPENTER (so international keyboard layouts work).
+#   * /dev/i2c-*    - to send the LED-control magic packet to the touchpad.
+#
+# Users still need to be in the `input` and `i2c` groups for these rules
+# to apply; usermod -aG i2c,input $USER and re-login.
+
+KERNEL=="uinput",     MODE="0660", GROUP="input", OPTIONS+="static_node=uinput"
+SUBSYSTEM=="i2c-dev", MODE="0660", GROUP="i2c"

@@ -73,6 +73,7 @@
             install -Dm644 packaging/de.guido.ayuz.desktop -t $out/share/applications/
             install -Dm644 packaging/de.guido.ayuz.metainfo.xml -t $out/share/metainfo/
             install -Dm644 assets/trayicon.png $out/share/icons/hicolor/128x128/apps/de.guido.ayuz.png
+            install -Dm644 packaging/udev/99-ayuz-numberpad.rules -t $out/lib/udev/rules.d/
           '';
 
           meta = with pkgs.lib; {
@@ -161,6 +162,14 @@
             services.udev.extraRules = ''
               ACTION=="add|change", KERNEL=="event*", ATTRS{name}=="*Touchpad*", MODE="0660", GROUP="input"
             '';
+
+            # NumberPad: pick up the bundled rules that grant the `input` and
+            # `i2c` groups access to /dev/uinput and /dev/i2c-*, load the
+            # kernel modules at boot, and ensure the `i2c` group exists so
+            # users can be added to it without a manual `groupadd`.
+            services.udev.packages = [ ayuz-pkg ];
+            boot.kernelModules = [ "uinput" "i2c-dev" ];
+            users.groups.i2c = { };
           };
         };
 

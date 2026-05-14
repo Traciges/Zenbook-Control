@@ -110,6 +110,7 @@ dependencies = [
  "image",
  "ksni",
  "libadwaita",
+ "libc",
  "relm4",
  "rog_anime",
  "rust-i18n",

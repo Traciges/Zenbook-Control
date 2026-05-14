@@ -180,6 +180,15 @@ error_touchpad_unsupported_desktop: "O ambiente '%{desktop}' não é suportado p
 touchpad_desktop_required: "Este recurso requer KDE Plasma ou GNOME."
 error_touchpad_kde: "Falha ao alternar o touchpad no KDE: %{error}"
 
+# numberpad
+numberpad_group_title: "NumberPad"
+numberpad_group_desc: "Use a grade de LEDs do touchpad como teclado numérico. Emite códigos de tecla Numpad padrão para que layouts de teclado internacionais funcionem nativamente."
+numberpad_enable_title: "Ativar NumberPad"
+numberpad_enable_subtitle: "Alterne o estado ativo em tempo de execução com: ayuz --toggle-numberpad"
+numberpad_status_no_hardware: "Nenhum touchpad compatível com ASUS NumberPad detectado neste dispositivo."
+numberpad_status_i2c_unavailable: "%{device} não está disponível. Verifique se os módulos do kernel 'i2c-dev' e 'uinput' estão carregados (sudo modprobe i2c-dev uinput)."
+numberpad_status_permission_denied: "Permissão negada em %{device}. Adicione seu usuário aos grupos 'i2c' e 'input' (sudo usermod -aG i2c,input $USER), depois saia e entre novamente."
+
 # battery
 battery_group_title: "Energia e desempenho"
 battery_group_desc: "Mantém a saúde da bateria mesmo quando conectada por longos períodos. Requer asusctl."

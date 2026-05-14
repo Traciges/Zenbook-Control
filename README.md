@@ -118,6 +118,35 @@ Controls for the AniMatrix LED matrix display found on select ROG laptops (e.g. 
 | --------------- | ------------------------------------------------------------------------- | ---------------------------- |
 | Smart Gestures  | Control volume, brightness, and media playback via touchpad edge swipes   | `brightnessctl`, `playerctl` |
 | Touchpad Toggle | Enable or disable the touchpad, with a 10-second auto-revert safety timer | KDE or GNOME                 |
+| ASUS NumberPad  | Toggle the LED numeric keypad embedded in the touchpad. Emits standard Linux Numpad keycodes (`KEY_KP0`..`KEY_KPENTER`) through a virtual uinput device, so international keyboard layouts (e.g. German, Lithuanian) work natively. Flip the active state at runtime with `ayuz --toggle-numberpad`. | `i2c-dev` + `uinput` kernel modules; user in `i2c` and `input` groups (see below) |
+
+#### NumberPad Requirements
+
+The NumberPad driver runs entirely in-process. It needs unprivileged read/write access to two kernel facilities:
+
+- **`/dev/i2c-N`** - the touchpad's I2C slave receives a 13-byte magic packet to turn the LED grid on or off.
+- **`/dev/uinput`** - a virtual keyboard emits Numpad keycodes when you tap a cell.
+
+1. Load the required kernel modules (persist via `/etc/modules-load.d/ayuz.conf` if you want them at boot):
+
+   ```bash
+   sudo modprobe i2c-dev uinput
+   ```
+
+2. Add your user to the `i2c` and `input` groups, then log out and back in:
+
+   ```bash
+   sudo usermod -aG i2c,input $USER
+   ```
+
+3. Install the bundled udev rules. Distro packages (Fedora/Debian/RPM/DEB) install them automatically to `/usr/lib/udev/rules.d/99-ayuz-numberpad.rules`. For source builds:
+
+   ```bash
+   sudo cp packaging/udev/99-ayuz-numberpad.rules /etc/udev/rules.d/
+   sudo udevadm control --reload-rules && sudo udevadm trigger
+   ```
+
+If any of these are missing the NumberPad row in the Touchpad page is disabled and shows an actionable error.
 
 ### Audio
 

@@ -22,3 +22,5 @@ pub mod edge_gestures;
 pub(crate) mod evdev_runner;
 pub mod fan_hotkey;
 pub mod migration;
+pub mod numberpad;
+pub mod numberpad_layouts;
