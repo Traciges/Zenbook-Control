@@ -25,6 +25,55 @@ use crate::services::dbus_animatrix::{
     detect_animatrix_hardware,
 };
 
+// Collapses the four `ChangeXxxAnim` update arms. Each lookup-table entry is
+// `(idx, &'static str)`; `field` is the cached `String` on `AnimatrixModel`
+// and `profile_field` is the matching key on the active profile.
+macro_rules! change_anim {
+    ($self:ident, $sender:ident, $idx:expr, $table:expr, $field:ident, $profile_field:ident) => {{
+        let val = anim_value(&$table, $idx).to_string();
+        if val == $self.$field {
+            return;
+        }
+        $self.$field = val;
+        AppConfig::update(|c| {
+            c.active_profile_mut().$profile_field = $self.$field.clone()
+        });
+        let anims = $self.build_animations();
+        $sender.command(move |out, shutdown| {
+            shutdown
+                .register(async move {
+                    match dbus_animatrix::set_animatrix_builtin_animations(anims).await {
+                        Ok(_) => out.emit(AnimatrixCommandOutput::Applied),
+                        Err(e) => out.emit(AnimatrixCommandOutput::Error(e)),
+                    }
+                })
+                .drop_on_shutdown()
+        });
+    }};
+}
+
+// Collapses the three `ToggleOffWhenXxx` update arms. `$setter` is the
+// `dbus_animatrix::set_animatrix_off_when_*` async function for that toggle.
+macro_rules! apply_off_toggle {
+    ($self:ident, $sender:ident, $v:expr, $field:ident, $profile_field:ident, $setter:path) => {{
+        if $v == $self.$field {
+            return;
+        }
+        $self.$field = $v;
+        AppConfig::update(|c| c.active_profile_mut().$profile_field = $v);
+        $sender.command(move |out, shutdown| {
+            shutdown
+                .register(async move {
+                    match $setter($v).await {
+                        Ok(_) => out.emit(AnimatrixCommandOutput::Applied),
+                        Err(e) => out.emit(AnimatrixCommandOutput::Error(e)),
+                    }
+                })
+                .drop_on_shutdown()
+        });
+    }};
+}
+
 // ── GIF catalogue ─────────────────────────────────────────────────────────────
 
 #[derive(Clone, Copy)]
@@ -261,15 +310,9 @@ impl Component for AnimatrixModel {
             set_description: Some(&t!("animatrix_group_desc")),
 
             // Hardware not present warning
-            add = &gtk::Label {
+            #[template]
+            add = &crate::components::widgets::DaemonWarningLabel {
                 set_label: &t!("animatrix_hardware_missing_warning"),
-                set_wrap: true,
-                add_css_class: "error",
-                set_xalign: 0.0,
-                set_margin_top: 8,
-                set_margin_start: 12,
-                set_margin_end: 12,
-                set_margin_bottom: 4,
                 #[watch]
                 set_visible: model.hardware_type == AnimatrixHardwareType::Unsupported,
             },
@@ -609,146 +652,26 @@ impl Component for AnimatrixModel {
             }
 
             AnimatrixMsg::ChangeBootAnim(idx) => {
-                let val = anim_value(&BOOT_ANIMS, idx).to_string();
-                if val == self.current_boot_anim {
-                    return;
-                }
-                self.current_boot_anim = val;
-                AppConfig::update(|c| {
-                    c.active_profile_mut().animatrix_boot_anim = self.current_boot_anim.clone()
-                });
-                let anims = self.build_animations();
-                sender.command(move |out, shutdown| {
-                    shutdown
-                        .register(async move {
-                            match dbus_animatrix::set_animatrix_builtin_animations(anims).await {
-                                Ok(_) => out.emit(AnimatrixCommandOutput::Applied),
-                                Err(e) => out.emit(AnimatrixCommandOutput::Error(e)),
-                            }
-                        })
-                        .drop_on_shutdown()
-                });
+                change_anim!(self, sender, idx, BOOT_ANIMS, current_boot_anim, animatrix_boot_anim);
             }
-
             AnimatrixMsg::ChangeAwakeAnim(idx) => {
-                let val = anim_value(&AWAKE_ANIMS, idx).to_string();
-                if val == self.current_awake_anim {
-                    return;
-                }
-                self.current_awake_anim = val;
-                AppConfig::update(|c| {
-                    c.active_profile_mut().animatrix_awake_anim = self.current_awake_anim.clone()
-                });
-                let anims = self.build_animations();
-                sender.command(move |out, shutdown| {
-                    shutdown
-                        .register(async move {
-                            match dbus_animatrix::set_animatrix_builtin_animations(anims).await {
-                                Ok(_) => out.emit(AnimatrixCommandOutput::Applied),
-                                Err(e) => out.emit(AnimatrixCommandOutput::Error(e)),
-                            }
-                        })
-                        .drop_on_shutdown()
-                });
+                change_anim!(self, sender, idx, AWAKE_ANIMS, current_awake_anim, animatrix_awake_anim);
             }
-
             AnimatrixMsg::ChangeSleepAnim(idx) => {
-                let val = anim_value(&SLEEP_ANIMS, idx).to_string();
-                if val == self.current_sleep_anim {
-                    return;
-                }
-                self.current_sleep_anim = val;
-                AppConfig::update(|c| {
-                    c.active_profile_mut().animatrix_sleep_anim = self.current_sleep_anim.clone()
-                });
-                let anims = self.build_animations();
-                sender.command(move |out, shutdown| {
-                    shutdown
-                        .register(async move {
-                            match dbus_animatrix::set_animatrix_builtin_animations(anims).await {
-                                Ok(_) => out.emit(AnimatrixCommandOutput::Applied),
-                                Err(e) => out.emit(AnimatrixCommandOutput::Error(e)),
-                            }
-                        })
-                        .drop_on_shutdown()
-                });
+                change_anim!(self, sender, idx, SLEEP_ANIMS, current_sleep_anim, animatrix_sleep_anim);
             }
-
             AnimatrixMsg::ChangeShutdownAnim(idx) => {
-                let val = anim_value(&SHUTDOWN_ANIMS, idx).to_string();
-                if val == self.current_shutdown_anim {
-                    return;
-                }
-                self.current_shutdown_anim = val;
-                AppConfig::update(|c| {
-                    c.active_profile_mut().animatrix_shutdown_anim =
-                        self.current_shutdown_anim.clone()
-                });
-                let anims = self.build_animations();
-                sender.command(move |out, shutdown| {
-                    shutdown
-                        .register(async move {
-                            match dbus_animatrix::set_animatrix_builtin_animations(anims).await {
-                                Ok(_) => out.emit(AnimatrixCommandOutput::Applied),
-                                Err(e) => out.emit(AnimatrixCommandOutput::Error(e)),
-                            }
-                        })
-                        .drop_on_shutdown()
-                });
+                change_anim!(self, sender, idx, SHUTDOWN_ANIMS, current_shutdown_anim, animatrix_shutdown_anim);
             }
 
             AnimatrixMsg::ToggleOffWhenUnplugged(v) => {
-                if v == self.current_off_unplugged {
-                    return;
-                }
-                self.current_off_unplugged = v;
-                AppConfig::update(|c| c.active_profile_mut().animatrix_off_when_unplugged = v);
-                sender.command(move |out, shutdown| {
-                    shutdown
-                        .register(async move {
-                            match dbus_animatrix::set_animatrix_off_when_unplugged(v).await {
-                                Ok(_) => out.emit(AnimatrixCommandOutput::Applied),
-                                Err(e) => out.emit(AnimatrixCommandOutput::Error(e)),
-                            }
-                        })
-                        .drop_on_shutdown()
-                });
+                apply_off_toggle!(self, sender, v, current_off_unplugged, animatrix_off_when_unplugged, dbus_animatrix::set_animatrix_off_when_unplugged);
             }
-
             AnimatrixMsg::ToggleOffWhenSuspended(v) => {
-                if v == self.current_off_suspended {
-                    return;
-                }
-                self.current_off_suspended = v;
-                AppConfig::update(|c| c.active_profile_mut().animatrix_off_when_suspended = v);
-                sender.command(move |out, shutdown| {
-                    shutdown
-                        .register(async move {
-                            match dbus_animatrix::set_animatrix_off_when_suspended(v).await {
-                                Ok(_) => out.emit(AnimatrixCommandOutput::Applied),
-                                Err(e) => out.emit(AnimatrixCommandOutput::Error(e)),
-                            }
-                        })
-                        .drop_on_shutdown()
-                });
+                apply_off_toggle!(self, sender, v, current_off_suspended, animatrix_off_when_suspended, dbus_animatrix::set_animatrix_off_when_suspended);
             }
-
             AnimatrixMsg::ToggleOffWhenLidClosed(v) => {
-                if v == self.current_off_lid_closed {
-                    return;
-                }
-                self.current_off_lid_closed = v;
-                AppConfig::update(|c| c.active_profile_mut().animatrix_off_when_lid_closed = v);
-                sender.command(move |out, shutdown| {
-                    shutdown
-                        .register(async move {
-                            match dbus_animatrix::set_animatrix_off_when_lid_closed(v).await {
-                                Ok(_) => out.emit(AnimatrixCommandOutput::Applied),
-                                Err(e) => out.emit(AnimatrixCommandOutput::Error(e)),
-                            }
-                        })
-                        .drop_on_shutdown()
-                });
+                apply_off_toggle!(self, sender, v, current_off_lid_closed, animatrix_off_when_lid_closed, dbus_animatrix::set_animatrix_off_when_lid_closed);
             }
 
             AnimatrixMsg::SelectGif(idx) => {

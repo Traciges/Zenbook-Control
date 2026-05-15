@@ -15,7 +15,7 @@
 // along with this program.  If not, see https://www.gnu.org/licenses/.
 
 pub mod sound_modes;
-pub use sound_modes::SoundModesModel;
+pub use sound_modes::{SoundModesModel, SoundModesMsg};
 
 pub mod volume;
 pub use volume::VolumeModel;

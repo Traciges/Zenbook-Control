@@ -55,7 +55,7 @@ pub struct SoundModesModel {
 }
 
 #[derive(Debug)]
-pub enum AudioMsg {
+pub enum SoundModesMsg {
     ChangeProfile(u32),
     CustomPresetPathSelected(PathBuf),
     CustomCancelled(u32),
@@ -74,7 +74,7 @@ pub enum AudioCommandOutput {
 #[relm4::component(pub)]
 impl Component for SoundModesModel {
     type Init = ();
-    type Input = AudioMsg;
+    type Input = SoundModesMsg;
     type Output = String;
     type CommandOutput = AudioCommandOutput;
 
@@ -83,17 +83,11 @@ impl Component for SoundModesModel {
             set_title: &t!("audio_profiles_title"),
             set_description: Some(&t!("audio_profiles_desc")),
 
-            add = &gtk::Label {
+            #[template]
+            add = &crate::components::widgets::DaemonWarningLabel {
                 #[watch]
                 set_visible: !model.ee_installed,
                 set_label: &t!("ee_missing_warning"),
-                add_css_class: "error",
-                set_wrap: true,
-                set_xalign: 0.0,
-                set_margin_top: 8,
-                set_margin_start: 12,
-                set_margin_end: 12,
-                set_margin_bottom: 4,
             },
 
             add = &adw::ActionRow {
@@ -130,7 +124,7 @@ impl Component for SoundModesModel {
         {
             let sender = sender.clone();
             dropdown.connect_selected_notify(move |dd| {
-                sender.input(AudioMsg::ChangeProfile(dd.selected()));
+                sender.input(SoundModesMsg::ChangeProfile(dd.selected()));
             });
         }
 
@@ -146,15 +140,8 @@ impl Component for SoundModesModel {
         sender.command(move |out, shutdown| {
             shutdown
                 .register(async move {
-                    let installed = tokio::task::spawn_blocking(|| {
-                        std::process::Command::new("which")
-                            .arg("easyeffects")
-                            .status()
-                            .map(|s| s.success())
-                            .unwrap_or(false)
-                    })
-                    .await
-                    .unwrap_or(false);
+                    let installed =
+                        crate::services::commands::which_exists("easyeffects").await;
                     out.emit(AudioCommandOutput::EeChecked(installed));
                 })
                 .drop_on_shutdown()
@@ -176,9 +163,9 @@ impl Component for SoundModesModel {
         ComponentParts { model, widgets }
     }
 
-    fn update(&mut self, msg: AudioMsg, sender: ComponentSender<Self>, _root: &Self::Root) {
+    fn update(&mut self, msg: SoundModesMsg, sender: ComponentSender<Self>, _root: &Self::Root) {
         match msg {
-            AudioMsg::ChangeProfile(idx) => {
+            SoundModesMsg::ChangeProfile(idx) => {
                 if idx == self.current_profile {
                     return;
                 }
@@ -203,13 +190,13 @@ impl Component for SoundModesModel {
                         match dialog.open_future(None::<&gtk::Window>).await {
                             Ok(file) => {
                                 if let Some(path) = file.path() {
-                                    sender_clone.input(AudioMsg::CustomPresetPathSelected(path));
+                                    sender_clone.input(SoundModesMsg::CustomPresetPathSelected(path));
                                 } else {
-                                    sender_clone.input(AudioMsg::CustomCancelled(previous));
+                                    sender_clone.input(SoundModesMsg::CustomCancelled(previous));
                                 }
                             }
                             Err(_) => {
-                                sender_clone.input(AudioMsg::CustomCancelled(previous));
+                                sender_clone.input(SoundModesMsg::CustomCancelled(previous));
                             }
                         }
                     });
@@ -233,9 +220,9 @@ impl Component for SoundModesModel {
                 });
             }
 
-            AudioMsg::CustomPresetPathSelected(path) => {
+            SoundModesMsg::CustomPresetPathSelected(path) => {
                 if extract_file_stem(&path).is_err() {
-                    sender.input(AudioMsg::CustomCancelled(self.previous_profile));
+                    sender.input(SoundModesMsg::CustomCancelled(self.previous_profile));
                     return;
                 }
 
@@ -255,12 +242,12 @@ impl Component for SoundModesModel {
                 });
             }
 
-            AudioMsg::CustomCancelled(previous) => {
+            SoundModesMsg::CustomCancelled(previous) => {
                 self.current_profile = previous;
                 self.dropdown.set_selected(previous);
                 AppConfig::update(|c| c.active_profile_mut().audio_profile = previous);
             }
-            AudioMsg::LoadProfile(idx) => {
+            SoundModesMsg::LoadProfile(idx) => {
                 if !self.ee_installed {
                     return;
                 }

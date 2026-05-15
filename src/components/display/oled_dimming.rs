@@ -57,28 +57,16 @@ impl Component for OledDimmingModel {
             set_title: &t!("oled_dimming_group_title"),
             set_description: Some(&t!("oled_dimming_group_desc")),
 
-            add = &gtk::Label {
+            #[template]
+            add = &crate::components::widgets::DaemonWarningLabel {
                 #[watch]
                 set_visible: !model.kde_available,
                 set_label: &t!("kde_required_warning"),
-                add_css_class: "error",
-                set_wrap: true,
-                set_xalign: 0.0,
-                set_margin_top: 8,
-                set_margin_start: 12,
-                set_margin_end: 12,
-                set_margin_bottom: 4,
             },
 
-            add = &gtk::Label {
+            #[template]
+            add = &crate::components::widgets::DaemonWarningLabel {
                 set_label: &t!("oled_dimming_warning"),
-                add_css_class: "error",
-                set_wrap: true,
-                set_xalign: 0.0,
-                set_margin_top: 8,
-                set_margin_start: 12,
-                set_margin_end: 12,
-                set_margin_bottom: 4,
             },
 
             add = &adw::ActionRow {

@@ -16,6 +16,46 @@
 
 use rust_i18n::t;
 
+// ── D-Bus identifiers ────────────────────────────────────────────────────────
+//
+// The `#[zbus::proxy]` macro requires string literals for its `default_service`
+// / `interface` attributes, so these constants are only used at runtime call
+// sites (object-manager probes, interface filters). Keep them in sync with the
+// `#[zbus::proxy(...)]` attributes below.
+pub(crate) const ASUSD_SERVICE: &str = "xyz.ljones.Asusd";
+pub(crate) const AURA_INTERFACE: &str = "xyz.ljones.Aura";
+
+// ── Singleton-proxy helper ───────────────────────────────────────────────────
+//
+// Most asusd interfaces are exposed at fixed object paths, so a single
+// `tokio::sync::OnceCell<Proxy>` per interface is enough. This macro removes
+// the otherwise-identical boilerplate for declaring the cell and an async
+// accessor that initialises it.
+//
+// `pub(crate) use proxy_singleton;` at the bottom of this snippet re-exports
+// the macro so sibling modules (e.g. `dbus_animatrix.rs`) can call it.
+macro_rules! proxy_singleton {
+    ($cell:ident, $accessor:ident, $proxy:ident) => {
+        static $cell: tokio::sync::OnceCell<$proxy<'static>> =
+            tokio::sync::OnceCell::const_new();
+
+        async fn $accessor() -> Result<&'static $proxy<'static>, String> {
+            $cell
+                .get_or_try_init(|| async {
+                    let conn = $crate::services::dbus::system_bus_connection().await?;
+                    $proxy::new(&conn)
+                        .await
+                        .map_err(|e| {
+                            rust_i18n::t!("error_dbus_proxy_create", error = e.to_string())
+                                .to_string()
+                        })
+                })
+                .await
+        }
+    };
+}
+pub(crate) use proxy_singleton;
+
 #[zbus::proxy(
     interface = "xyz.ljones.Platform",
     default_service = "xyz.ljones.Asusd",
@@ -60,13 +100,6 @@ impl From<u32> for FanProfile {
     }
 }
 
-/// Lazily-initialized singleton proxy to the `xyz.ljones.Asusd` D-Bus service.
-///
-/// The proxy is created once on first use and reused for all subsequent calls,
-/// avoiding repeated connection overhead.
-static PLATFORM_PROXY: tokio::sync::OnceCell<PlatformProxy<'static>> =
-    tokio::sync::OnceCell::const_new();
-
 /// Opens a system D-Bus connection, mapping errors to localised strings.
 pub(crate) async fn system_bus_connection() -> Result<zbus::Connection, String> {
     zbus::Connection::system()
@@ -74,17 +107,7 @@ pub(crate) async fn system_bus_connection() -> Result<zbus::Connection, String> 
         .map_err(|e| t!("error_dbus_connect", error = e.to_string()).to_string())
 }
 
-/// Returns a reference to the shared [`PlatformProxy`], initialising it on first call.
-async fn platform_proxy() -> Result<&'static PlatformProxy<'static>, String> {
-    PLATFORM_PROXY
-        .get_or_try_init(|| async {
-            let conn = system_bus_connection().await?;
-            PlatformProxy::new(&conn)
-                .await
-                .map_err(|e| t!("error_dbus_proxy_create", error = e.to_string()).to_string())
-        })
-        .await
-}
+proxy_singleton!(PLATFORM_PROXY, platform_proxy, PlatformProxy);
 
 /// Returns `true` if the `asusd` D-Bus service is reachable.
 ///
@@ -210,21 +233,7 @@ impl GfxMode {
     }
 }
 
-/// Lazily-initialized singleton proxy to the `org.supergfxctl.Daemon` D-Bus service.
-static SUPERGFX_PROXY: tokio::sync::OnceCell<SuperGfxProxy<'static>> =
-    tokio::sync::OnceCell::const_new();
-
-/// Returns a reference to the shared [`SuperGfxProxy`], initialising it on first call.
-async fn supergfx_proxy() -> Result<&'static SuperGfxProxy<'static>, String> {
-    SUPERGFX_PROXY
-        .get_or_try_init(|| async {
-            let conn = system_bus_connection().await?;
-            SuperGfxProxy::new(&conn)
-                .await
-                .map_err(|e| t!("error_dbus_proxy_create", error = e.to_string()).to_string())
-        })
-        .await
-}
+proxy_singleton!(SUPERGFX_PROXY, supergfx_proxy, SuperGfxProxy);
 
 /// Returns `true` if the `supergfxctl` D-Bus service is reachable.
 ///
@@ -291,21 +300,11 @@ trait AsusArmoury {
     fn possible_values(&self) -> zbus::Result<Vec<i32>>;
 }
 
-/// Lazily-initialized singleton proxy to the `apu_mem` AsusArmoury D-Bus object.
-static ASUS_ARMOURY_APU_MEM_PROXY: tokio::sync::OnceCell<AsusArmouryProxy<'static>> =
-    tokio::sync::OnceCell::const_new();
-
-/// Returns a reference to the shared [`AsusArmouryProxy`] for `apu_mem`, initialising it on first call.
-async fn asus_armoury_apu_mem_proxy() -> Result<&'static AsusArmouryProxy<'static>, String> {
-    ASUS_ARMOURY_APU_MEM_PROXY
-        .get_or_try_init(|| async {
-            let conn = system_bus_connection().await?;
-            AsusArmouryProxy::new(&conn)
-                .await
-                .map_err(|e| t!("error_dbus_proxy_create", error = e.to_string()).to_string())
-        })
-        .await
-}
+proxy_singleton!(
+    ASUS_ARMOURY_APU_MEM_PROXY,
+    asus_armoury_apu_mem_proxy,
+    AsusArmouryProxy
+);
 
 /// Reads the current APU memory (UMA frame buffer) size from `asusd`.
 pub async fn get_apu_mem() -> Result<i32, String> {
@@ -723,7 +722,7 @@ pub async fn is_asusd_running() -> bool {
 pub async fn discover_aura_devices() -> Result<Vec<AuraDeviceInfo>, String> {
     let conn = system_bus_connection().await?;
     let om = zbus::fdo::ObjectManagerProxy::builder(&conn)
-        .destination("xyz.ljones.Asusd")
+        .destination(ASUSD_SERVICE)
         .map_err(|e| t!("error_dbus_proxy_create", error = e.to_string()).to_string())?
         .path("/")
         .map_err(|e| t!("error_dbus_proxy_create", error = e.to_string()).to_string())?
@@ -738,7 +737,7 @@ pub async fn discover_aura_devices() -> Result<Vec<AuraDeviceInfo>, String> {
 
     let mut out = Vec::new();
     for (object_path, ifaces) in managed {
-        if !ifaces.contains_key("xyz.ljones.Aura") {
+        if !ifaces.contains_key(AURA_INTERFACE) {
             continue;
         }
         let path: OwnedObjectPath = object_path;

@@ -17,14 +17,12 @@
 use std::os::unix::process::CommandExt;
 use std::process::Command;
 
-use crate::components::audio::SoundModesModel;
-use crate::components::audio::VolumeModel;
+use crate::components::audio::{SoundModesModel, SoundModesMsg, VolumeModel};
 use crate::components::display::ColorGamutModel;
 use crate::components::display::OledCareModel;
 use crate::components::display::OledDimmingModel;
 use crate::components::display::TargetModeModel;
 use crate::components::home::{HomeModel, HomeOutput};
-use crate::components::audio::sound_modes::AudioMsg;
 use crate::components::audio::volume::VolumeMsg;
 use crate::components::display::color_gamut::ColorGamutMsg;
 use crate::components::display::oled_care::OledCareMsg;
@@ -148,6 +146,77 @@ pub struct AppModel {
     volume_widget: Controller<VolumeModel>,
 }
 
+impl AppModel {
+    /// Broadcasts the active profile's settings to every sub-component.
+    ///
+    /// Each `LoadProfile` message is the canonical entry point that tells a
+    /// component to overwrite its in-memory state with the values from
+    /// `profile`. Grouped per page so the call sites stay readable.
+    fn distribute_profile(&self, p: &crate::services::config::Profile) {
+        // Display
+        self.fan.sender().emit(FanMsg::LoadProfile(FanProfile::from(p.fan_profile)));
+        self.oled_dimming.sender().emit(OledDimmingMsg::LoadProfile(p.oled_dc_dimming));
+        self.target_mode.sender().emit(TargetModeMsg::LoadProfile(p.target_mode_active));
+        self.color_gamut.sender().emit(ColorGamutMsg::LoadProfile(p.color_profile_index));
+        self.oled_care.sender().emit(OledCareMsg::LoadProfile {
+            pixel_refresh: p.oled_care_pixel_refresh,
+            panel_autohide: p.oled_care_panel_autohide,
+            transparency: p.oled_care_transparency,
+        });
+
+        // Audio
+        self.sound_modes.sender().emit(SoundModesMsg::LoadProfile(p.audio_profile));
+        self.volume_widget.sender().emit(VolumeMsg::LoadProfile(p.volume));
+
+        // Keyboard & input
+        self.auto_backlight.sender().emit(AutoBacklightMsg::LoadProfile {
+            brighten: p.kbd_brighten_active,
+            dim: p.kbd_dim_active,
+            brighten_threshold: p.kbd_brighten_threshold,
+            dim_threshold: p.kbd_dim_threshold,
+        });
+        self.backlight_idle.sender().emit(BacklightIdleMsg::LoadProfile {
+            mode: p.kbd_timeout_mode,
+            ac_index: p.kbd_timeout_battery_ac_index,
+            battery_index: p.kbd_timeout_battery_only_index,
+        });
+        self.aura.sender().emit(AuraPageMsg::LoadProfile {
+            mode: p.aura_mode,
+            zone: p.aura_zone,
+            brightness: p.aura_brightness,
+            colour_r: p.aura_colour_r,
+            colour_g: p.aura_colour_g,
+            colour_b: p.aura_colour_b,
+            colour2_r: p.aura_colour2_r,
+            colour2_g: p.aura_colour2_g,
+            colour2_b: p.aura_colour2_b,
+            speed: p.aura_speed.clone(),
+            direction: p.aura_direction.clone(),
+        });
+        self.animatrix.sender().emit(AnimatrixMsg::LoadProfile {
+            enable_display: p.animatrix_enable_display,
+            brightness: p.animatrix_brightness,
+            builtins_enabled: p.animatrix_builtins_enabled,
+            boot_anim: p.animatrix_boot_anim.clone(),
+            awake_anim: p.animatrix_awake_anim.clone(),
+            sleep_anim: p.animatrix_sleep_anim.clone(),
+            shutdown_anim: p.animatrix_shutdown_anim.clone(),
+            off_unplugged: p.animatrix_off_when_unplugged,
+            off_suspended: p.animatrix_off_when_suspended,
+            off_lid_closed: p.animatrix_off_when_lid_closed,
+        });
+        self.touchpad.sender().emit(TouchpadMsg::LoadProfile(p.touchpad_active));
+        self.gestures.sender().emit(GesturesMsg::LoadProfile(p.input_gestures_active));
+        self.numberpad.sender().emit(NumberpadMsg::LoadProfile(p.numberpad_active));
+        self.fn_key.sender().emit(FnKeyMsg::LoadProfile(p.input_fn_key_locked));
+
+        // System
+        self.battery.sender().emit(BatteryMsg::LoadProfile(p.battery_deep_sleep_active));
+        self.gpu.sender().emit(GpuMsg::LoadProfile(p.gpu_mode));
+        self.apu_mem.sender().emit(ApuMemMsg::LoadProfile(p.apu_mem));
+    }
+}
+
 #[relm4::component(pub)]
 impl SimpleComponent for AppModel {
     type Init = bool;
@@ -204,69 +273,7 @@ impl SimpleComponent for AppModel {
             AppMsg::ActivateProfile(id) => {
                 crate::services::config::AppConfig::update(|c| c.active_profile_id = id.clone());
                 let config = crate::services::config::AppConfig::load();
-                let p = config.active_profile().clone();
-
-                // Display
-                self.fan.sender().emit(FanMsg::LoadProfile(FanProfile::from(p.fan_profile)));
-                self.oled_dimming.sender().emit(OledDimmingMsg::LoadProfile(p.oled_dc_dimming));
-                self.target_mode.sender().emit(TargetModeMsg::LoadProfile(p.target_mode_active));
-                self.color_gamut.sender().emit(ColorGamutMsg::LoadProfile(p.color_profile_index));
-                self.oled_care.sender().emit(OledCareMsg::LoadProfile {
-                    pixel_refresh: p.oled_care_pixel_refresh,
-                    panel_autohide: p.oled_care_panel_autohide,
-                    transparency: p.oled_care_transparency,
-                });
-
-                // Audio
-                self.sound_modes.sender().emit(AudioMsg::LoadProfile(p.audio_profile));
-                self.volume_widget.sender().emit(VolumeMsg::LoadProfile(p.volume));
-
-                // Keyboard & input
-                self.auto_backlight.sender().emit(AutoBacklightMsg::LoadProfile {
-                    brighten: p.kbd_brighten_active,
-                    dim: p.kbd_dim_active,
-                    brighten_threshold: p.kbd_brighten_threshold,
-                    dim_threshold: p.kbd_dim_threshold,
-                });
-                self.backlight_idle.sender().emit(BacklightIdleMsg::LoadProfile {
-                    mode: p.kbd_timeout_mode,
-                    ac_index: p.kbd_timeout_battery_ac_index,
-                    battery_index: p.kbd_timeout_battery_only_index,
-                });
-                self.aura.sender().emit(AuraPageMsg::LoadProfile {
-                    mode: p.aura_mode,
-                    zone: p.aura_zone,
-                    brightness: p.aura_brightness,
-                    colour_r: p.aura_colour_r,
-                    colour_g: p.aura_colour_g,
-                    colour_b: p.aura_colour_b,
-                    colour2_r: p.aura_colour2_r,
-                    colour2_g: p.aura_colour2_g,
-                    colour2_b: p.aura_colour2_b,
-                    speed: p.aura_speed.clone(),
-                    direction: p.aura_direction.clone(),
-                });
-                self.animatrix.sender().emit(AnimatrixMsg::LoadProfile {
-                    enable_display: p.animatrix_enable_display,
-                    brightness: p.animatrix_brightness,
-                    builtins_enabled: p.animatrix_builtins_enabled,
-                    boot_anim: p.animatrix_boot_anim.clone(),
-                    awake_anim: p.animatrix_awake_anim.clone(),
-                    sleep_anim: p.animatrix_sleep_anim.clone(),
-                    shutdown_anim: p.animatrix_shutdown_anim.clone(),
-                    off_unplugged: p.animatrix_off_when_unplugged,
-                    off_suspended: p.animatrix_off_when_suspended,
-                    off_lid_closed: p.animatrix_off_when_lid_closed,
-                });
-                self.touchpad.sender().emit(TouchpadMsg::LoadProfile(p.touchpad_active));
-                self.gestures.sender().emit(GesturesMsg::LoadProfile(p.input_gestures_active));
-                self.numberpad.sender().emit(NumberpadMsg::LoadProfile(p.numberpad_active));
-                self.fn_key.sender().emit(FnKeyMsg::LoadProfile(p.input_fn_key_locked));
-
-                // System
-                self.battery.sender().emit(BatteryMsg::LoadProfile(p.battery_deep_sleep_active));
-                self.gpu.sender().emit(GpuMsg::LoadProfile(p.gpu_mode));
-                self.apu_mem.sender().emit(ApuMemMsg::LoadProfile(p.apu_mem));
+                self.distribute_profile(config.active_profile());
             }
             AppMsg::LegacyMigrationAccepted => {
                 match crate::services::migration::perform_migration() {
@@ -478,36 +485,7 @@ impl SimpleComponent for AppModel {
         keyboard_page.add(backlight_idle_widget);
         keyboard_page.add(fn_key_widget);
 
-        let asus_key_hint_group = adw::PreferencesGroup::new();
-        asus_key_hint_group.set_title(&t!("asus_key_hint_group_title"));
-        let asus_key_hint_row = adw::ActionRow::new();
-        asus_key_hint_row.set_title(&t!("asus_key_hint_row_title"));
-        asus_key_hint_row.set_subtitle(&t!("asus_key_hint_row_subtitle"));
-        asus_key_hint_group.add(&asus_key_hint_row);
-
-        let initial_cfg = crate::services::config::AppConfig::load();
-
-        let fan_hotkey_row = adw::SwitchRow::new();
-        fan_hotkey_row.set_title(&t!("fan_hotkey_enable_title"));
-        fan_hotkey_row.set_subtitle(&t!("fan_hotkey_enable_subtitle"));
-        fan_hotkey_row.set_active(initial_cfg.fan_hotkey_enabled);
-        fan_hotkey_row.connect_active_notify(move |row| {
-            let active = row.is_active();
-            crate::services::config::AppConfig::update(|c| c.fan_hotkey_enabled = active);
-            let _ = fan_hotkey_tx.send(active);
-        });
-        asus_key_hint_group.add(&fan_hotkey_row);
-
-        let fan_osd_row = adw::SwitchRow::new();
-        fan_osd_row.set_title(&t!("fan_osd_enabled_title"));
-        fan_osd_row.set_subtitle(&t!("fan_osd_enabled_subtitle"));
-        fan_osd_row.set_active(initial_cfg.fan_osd_enabled);
-        fan_osd_row.connect_active_notify(|row| {
-            let active = row.is_active();
-            crate::services::config::AppConfig::update(|c| c.fan_osd_enabled = active);
-        });
-        asus_key_hint_group.add(&fan_osd_row);
-
+        let asus_key_hint_group = build_asus_key_hint_group(fan_hotkey_tx);
         keyboard_page.add(&asus_key_hint_group);
 
         let touchpad_page = adw::PreferencesPage::new();
@@ -525,79 +503,10 @@ impl SimpleComponent for AppModel {
         system_page.add(gpu_widget);
         system_page.add(apu_mem_widget);
 
-        let lang_group = adw::PreferencesGroup::new();
-        lang_group.set_title(&t!("app_settings_title"));
-
-        let lang_row = adw::ActionRow::new();
-        lang_row.set_title(&t!("language_title"));
-
-        const SUPPORTED_LANGS: &[(&str, &str)] = &[
-            ("English", "en"),
-            ("Deutsch", "de"),
-            ("Português Brasileiro", "pt-br"),
-        ];
-
-        let display_names: Vec<&str> = SUPPORTED_LANGS.iter().map(|(name, _)| *name).collect();
-        let lang_dropdown = gtk4::DropDown::from_strings(&display_names);
-        lang_dropdown.set_valign(gtk4::Align::Center);
-
-        let current_lang = crate::services::config::AppConfig::load().language;
-        if let Some(idx) = SUPPORTED_LANGS
-            .iter()
-            .position(|(_, code)| *code == current_lang)
-        {
-            lang_dropdown.set_selected(idx as u32);
-        }
-
-        let sender_clone = sender.clone();
-        lang_dropdown.connect_selected_notify(move |dd| {
-            let idx = dd.selected() as usize;
-            if let Some(&(_, code)) = SUPPORTED_LANGS.get(idx) {
-                sender_clone.input(AppMsg::SetLanguage(code.to_string()));
-            }
-        });
-
-        lang_row.add_suffix(&lang_dropdown);
-        lang_row.set_activatable_widget(Some(&lang_dropdown));
-        lang_group.add(&lang_row);
-
-        let autostart_row = adw::SwitchRow::new();
-        autostart_row.set_title(&t!("autostart_title"));
-        autostart_row.set_active(crate::autostart::is_enabled());
-        let sender_at = sender.clone();
-        autostart_row.connect_active_notify(move |row| {
-            sender_at.input(AppMsg::ToggleAutostart(row.is_active()));
-        });
-        lang_group.add(&autostart_row);
-
+        let lang_group = build_language_and_autostart_group(&sender);
         system_page.add(&lang_group);
 
-        let legacy_available = crate::services::migration::legacy_dir_exists();
-
-        let legacy_group = adw::PreferencesGroup::new();
-        legacy_group.set_title(&t!("legacy_migration_group_title"));
-        legacy_group.set_description(Some(&t!("legacy_migration_group_desc")));
-
-        let legacy_row = adw::ActionRow::new();
-        legacy_row.set_title(&t!("legacy_migration_row_title"));
-        if legacy_available {
-            legacy_row.set_subtitle(&t!("legacy_migration_row_subtitle_available"));
-        } else {
-            legacy_row.set_subtitle(&t!("legacy_migration_row_subtitle_unavailable"));
-        }
-
-        let legacy_btn = gtk4::Button::with_label(&t!("legacy_migration_button"));
-        legacy_btn.add_css_class("suggested-action");
-        legacy_btn.set_valign(gtk4::Align::Center);
-        legacy_btn.set_sensitive(legacy_available);
-
-        let sender_migration = sender.clone();
-        legacy_btn.connect_clicked(move |_| {
-            sender_migration.input(AppMsg::TriggerManualMigration);
-        });
-
-        legacy_row.add_suffix(&legacy_btn);
-        legacy_group.add(&legacy_row);
+        let legacy_group = build_legacy_migration_group(&sender);
         system_page.add(&legacy_group);
 
         // Widget map for scroll-to-widget
@@ -843,4 +752,135 @@ impl SimpleComponent for AppModel {
 
         ComponentParts { model, widgets }
     }
+}
+
+// ── PreferencesGroup builders ────────────────────────────────────────────────
+//
+// Self-contained subsections of `init()` extracted so the function focuses on
+// wiring. Each builder owns its row construction and signal hookups.
+
+/// Hint group hosted on the keyboard page. Surfaces the ASUS hardware-key
+/// shortcut help row plus two app-level toggles (fan-profile hotkey + OSD).
+///
+/// `fan_hotkey_tx` is the `watch::Sender` that `services::fan_hotkey::run`
+/// subscribes to — toggling the row pushes the new state to the running task.
+fn build_asus_key_hint_group(
+    fan_hotkey_tx: tokio::sync::watch::Sender<bool>,
+) -> adw::PreferencesGroup {
+    let group = adw::PreferencesGroup::new();
+    group.set_title(&t!("asus_key_hint_group_title"));
+
+    let hint_row = adw::ActionRow::new();
+    hint_row.set_title(&t!("asus_key_hint_row_title"));
+    hint_row.set_subtitle(&t!("asus_key_hint_row_subtitle"));
+    group.add(&hint_row);
+
+    let cfg = crate::services::config::AppConfig::load();
+
+    let fan_hotkey_row = adw::SwitchRow::new();
+    fan_hotkey_row.set_title(&t!("fan_hotkey_enable_title"));
+    fan_hotkey_row.set_subtitle(&t!("fan_hotkey_enable_subtitle"));
+    fan_hotkey_row.set_active(cfg.fan_hotkey_enabled);
+    fan_hotkey_row.connect_active_notify(move |row| {
+        let active = row.is_active();
+        crate::services::config::AppConfig::update(|c| c.fan_hotkey_enabled = active);
+        let _ = fan_hotkey_tx.send(active);
+    });
+    group.add(&fan_hotkey_row);
+
+    let fan_osd_row = adw::SwitchRow::new();
+    fan_osd_row.set_title(&t!("fan_osd_enabled_title"));
+    fan_osd_row.set_subtitle(&t!("fan_osd_enabled_subtitle"));
+    fan_osd_row.set_active(cfg.fan_osd_enabled);
+    fan_osd_row.connect_active_notify(|row| {
+        let active = row.is_active();
+        crate::services::config::AppConfig::update(|c| c.fan_osd_enabled = active);
+    });
+    group.add(&fan_osd_row);
+
+    group
+}
+
+/// "App settings" group on the system page: language dropdown + autostart switch.
+fn build_language_and_autostart_group(
+    sender: &ComponentSender<AppModel>,
+) -> adw::PreferencesGroup {
+    const SUPPORTED_LANGS: &[(&str, &str)] = &[
+        ("English", "en"),
+        ("Deutsch", "de"),
+        ("Português Brasileiro", "pt-br"),
+    ];
+
+    let group = adw::PreferencesGroup::new();
+    group.set_title(&t!("app_settings_title"));
+
+    let lang_row = adw::ActionRow::new();
+    lang_row.set_title(&t!("language_title"));
+
+    let display_names: Vec<&str> = SUPPORTED_LANGS.iter().map(|(name, _)| *name).collect();
+    let lang_dropdown = gtk4::DropDown::from_strings(&display_names);
+    lang_dropdown.set_valign(gtk4::Align::Center);
+
+    let current_lang = crate::services::config::AppConfig::load().language;
+    if let Some(idx) = SUPPORTED_LANGS
+        .iter()
+        .position(|(_, code)| *code == current_lang)
+    {
+        lang_dropdown.set_selected(idx as u32);
+    }
+
+    let sender_lang = sender.clone();
+    lang_dropdown.connect_selected_notify(move |dd| {
+        let idx = dd.selected() as usize;
+        if let Some(&(_, code)) = SUPPORTED_LANGS.get(idx) {
+            sender_lang.input(AppMsg::SetLanguage(code.to_string()));
+        }
+    });
+
+    lang_row.add_suffix(&lang_dropdown);
+    lang_row.set_activatable_widget(Some(&lang_dropdown));
+    group.add(&lang_row);
+
+    let autostart_row = adw::SwitchRow::new();
+    autostart_row.set_title(&t!("autostart_title"));
+    autostart_row.set_active(crate::autostart::is_enabled());
+    let sender_at = sender.clone();
+    autostart_row.connect_active_notify(move |row| {
+        sender_at.input(AppMsg::ToggleAutostart(row.is_active()));
+    });
+    group.add(&autostart_row);
+
+    group
+}
+
+/// One-shot migration helper shown on the system page when an
+/// `ayuz-old` config directory exists from a pre-1.0 install.
+fn build_legacy_migration_group(sender: &ComponentSender<AppModel>) -> adw::PreferencesGroup {
+    let available = crate::services::migration::legacy_dir_exists();
+
+    let group = adw::PreferencesGroup::new();
+    group.set_title(&t!("legacy_migration_group_title"));
+    group.set_description(Some(&t!("legacy_migration_group_desc")));
+
+    let row = adw::ActionRow::new();
+    row.set_title(&t!("legacy_migration_row_title"));
+    row.set_subtitle(&t!(if available {
+        "legacy_migration_row_subtitle_available"
+    } else {
+        "legacy_migration_row_subtitle_unavailable"
+    }));
+
+    let btn = gtk4::Button::with_label(&t!("legacy_migration_button"));
+    btn.add_css_class("suggested-action");
+    btn.set_valign(gtk4::Align::Center);
+    btn.set_sensitive(available);
+
+    let sender_clone = sender.clone();
+    btn.connect_clicked(move |_| {
+        sender_clone.input(AppMsg::TriggerManualMigration);
+    });
+
+    row.add_suffix(&btn);
+    group.add(&row);
+    group
 }

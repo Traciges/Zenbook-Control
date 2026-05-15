@@ -18,7 +18,11 @@ use rust_i18n::t;
 use serde::{Deserialize, Serialize};
 use zbus::zvariant::{OwnedValue, Type, Value};
 
-use super::dbus::system_bus_connection;
+use super::dbus::{proxy_singleton, ASUSD_SERVICE};
+
+/// AniMatrix D-Bus interface name. Mirrors the literal used in the
+/// `#[zbus::proxy(interface = ...)]` attribute below.
+const ANIME_INTERFACE: &str = "xyz.ljones.Anime";
 
 // ── Hardware detection (DMI, no daemon required) ─────────────────────────────
 
@@ -160,19 +164,7 @@ trait Animatrix {
 
 // ── Singleton proxy ───────────────────────────────────────────────────────────
 
-static ANIMATRIX_PROXY: tokio::sync::OnceCell<AnimatrixProxy<'static>> =
-    tokio::sync::OnceCell::const_new();
-
-async fn animatrix_proxy() -> Result<&'static AnimatrixProxy<'static>, String> {
-    ANIMATRIX_PROXY
-        .get_or_try_init(|| async {
-            let conn = system_bus_connection().await?;
-            AnimatrixProxy::new(&conn)
-                .await
-                .map_err(|e| t!("error_dbus_proxy_create", error = e.to_string()).to_string())
-        })
-        .await
-}
+proxy_singleton!(ANIMATRIX_PROXY, animatrix_proxy, AnimatrixProxy);
 
 // ── Availability check ────────────────────────────────────────────────────────
 
@@ -187,7 +179,7 @@ pub async fn check_animatrix_status() -> AnimatrixStatus {
     };
 
     let manager = match zbus::fdo::ObjectManagerProxy::builder(&conn)
-        .destination("xyz.ljones.Asusd")
+        .destination(ASUSD_SERVICE)
         .unwrap()
         .path("/")
         .unwrap()
@@ -205,7 +197,7 @@ pub async fn check_animatrix_status() -> AnimatrixStatus {
 
     let has_anime = objects
         .values()
-        .any(|ifaces| ifaces.contains_key("xyz.ljones.Anime"));
+        .any(|ifaces| ifaces.contains_key(ANIME_INTERFACE));
 
     if has_anime {
         AnimatrixStatus::Available

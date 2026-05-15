@@ -58,17 +58,11 @@ impl Component for GesturesModel {
             set_title: &t!("gestures_group_title"),
             set_description: Some(&t!("gestures_group_desc")),
 
-            add = &gtk::Label {
+            #[template]
+            add = &crate::components::widgets::DaemonWarningLabel {
                 #[watch]
                 set_visible: !model.brightnessctl_available || !model.playerctl_available,
                 set_label: &t!("gestures_deps_missing_warning"),
-                add_css_class: "error",
-                set_wrap: true,
-                set_xalign: 0.0,
-                set_margin_top: 8,
-                set_margin_start: 12,
-                set_margin_end: 12,
-                set_margin_bottom: 4,
             },
 
             add = &gtk::Box {
@@ -141,15 +135,7 @@ impl Component for GesturesModel {
         sender.command(|out, shutdown| {
             shutdown
                 .register(async move {
-                    let ok = tokio::task::spawn_blocking(|| {
-                        std::process::Command::new("which")
-                            .arg("brightnessctl")
-                            .status()
-                            .map(|s| s.success())
-                            .unwrap_or(false)
-                    })
-                    .await
-                    .unwrap_or(false);
+                    let ok = crate::services::commands::which_exists("brightnessctl").await;
                     out.send(GesturesCommandOutput::BrightnessctlChecked(ok)).ok();
                 })
                 .drop_on_shutdown()
@@ -158,15 +144,7 @@ impl Component for GesturesModel {
         sender.command(|out, shutdown| {
             shutdown
                 .register(async move {
-                    let ok = tokio::task::spawn_blocking(|| {
-                        std::process::Command::new("which")
-                            .arg("playerctl")
-                            .status()
-                            .map(|s| s.success())
-                            .unwrap_or(false)
-                    })
-                    .await
-                    .unwrap_or(false);
+                    let ok = crate::services::commands::which_exists("playerctl").await;
                     out.send(GesturesCommandOutput::PlayerctlChecked(ok)).ok();
                 })
                 .drop_on_shutdown()

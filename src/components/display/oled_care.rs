@@ -14,7 +14,6 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see https://www.gnu.org/licenses/.
 
-use gtk4 as gtk;
 use relm4::adw;
 use relm4::adw::prelude::*;
 use relm4::prelude::*;
@@ -63,28 +62,16 @@ impl Component for OledCareModel {
             set_title: &t!("oled_care_group_title"),
             set_description: Some(&t!("oled_care_group_desc")),
 
-            add = &gtk::Label {
+            #[template]
+            add = &crate::components::widgets::DaemonWarningLabel {
                 #[watch]
                 set_visible: !model.kde_available,
                 set_label: &t!("kde_required_warning"),
-                add_css_class: "error",
-                set_wrap: true,
-                set_xalign: 0.0,
-                set_margin_top: 8,
-                set_margin_start: 12,
-                set_margin_end: 12,
-                set_margin_bottom: 4,
             },
 
-            add = &gtk::Label {
+            #[template]
+            add = &crate::components::widgets::DaemonWarningLabel {
                 set_label: &t!("oled_care_group_notice"),
-                add_css_class: "error",
-                set_wrap: true,
-                set_xalign: 0.0,
-                set_margin_top: 8,
-                set_margin_start: 12,
-                set_margin_end: 12,
-                set_margin_bottom: 4,
             },
 
             add = &adw::SwitchRow {
