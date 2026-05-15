@@ -184,10 +184,10 @@ error_touchpad_kde: "KDE Touchpad-Toggle fehlgeschlagen. %{error}"
 numberpad_group_title: "NumberPad"
 numberpad_group_desc: "Nutzt das LED-Raster des Touchpads als Zehnertastatur. Sendet Standard-Numpad-Keycodes, damit internationale Tastaturlayouts nativ funktionieren."
 numberpad_enable_title: "NumberPad aktivieren"
-numberpad_enable_subtitle: "Aktiven Zustand zur Laufzeit umschalten mit: ayuz --toggle-numberpad"
+numberpad_enable_subtitle: "Aktiviert die LED-Nummerntastatur, die auf dem Touchpad bestimmter ASUS-Laptops aufgedruckt ist."
 numberpad_status_no_hardware: "Kein ASUS-NumberPad-fähiges Touchpad auf diesem Gerät erkannt."
 numberpad_status_i2c_unavailable: "%{device} ist nicht verfügbar. Stelle sicher, dass die Kernel-Module 'i2c-dev' und 'uinput' geladen sind (sudo modprobe i2c-dev uinput)."
-numberpad_status_permission_denied: "Zugriff verweigert auf %{device}. Füge deinen Benutzer den Gruppen 'i2c' und 'input' hinzu (sudo usermod -aG i2c,input $USER) und melde dich ab und wieder an."
+numberpad_status_permission_denied: "Zugriff verweigert auf %{device}. Füge deinen Benutzer den Gruppen 'i2c' und 'input' hinzu (sudo usermod -aG i2c,input $USER) und starte den Rechner neu."
 
 # battery
 battery_group_title: "Energie & Leistung"
