@@ -50,8 +50,13 @@ use crate::services::evdev_runner::{find_touchpad, open_event_stream, touchpad_a
 use crate::services::numberpad_layouts::{self, Layout};
 use crate::sys_paths::{DEV_UINPUT, PROC_BUS_INPUT_DEVICES, SYS_PRODUCT_NAME};
 
-/// Linux ioctl request number for `I2C_SLAVE` (set slave address).
-const I2C_SLAVE: libc::c_ulong = 0x0703;
+/// Linux ioctl request number for `I2C_SLAVE_FORCE` (set slave address even
+/// if another kernel driver currently holds the device). The plain
+/// `I2C_SLAVE` ioctl (`0x0703`) fails with `EBUSY` because `i2c_hid` is
+/// permanently bound to the touchpad. The vendor LED register we target
+/// lives outside the HID conversation, so taking the slot by force is safe
+/// and matches what the upstream Python `asus-numberpad-driver` does.
+const I2C_SLAVE_FORCE: libc::c_ulong = 0x0706;
 
 /// The 13-byte LED-control packet. Bytes 0..11 are constant, byte 11 is the
 /// state, byte 12 is the terminator `0xad`.
@@ -201,8 +206,9 @@ pub async fn probe() -> NumberpadStatus {
 /// Writes one 13-byte LED-control packet to the touchpad's I2C slave.
 fn i2c_send(i2c_path: &Path, addr: u16, state: u8) -> std::io::Result<()> {
     let mut file = fs::OpenOptions::new().write(true).open(i2c_path)?;
-    // SAFETY: I2C_SLAVE just stores the address in the kernel-side fd state.
-    let rc = unsafe { libc::ioctl(file.as_raw_fd(), I2C_SLAVE, addr as libc::c_int) };
+    // SAFETY: I2C_SLAVE_FORCE just stores the address in the kernel-side fd
+    // state, even when another driver (here: i2c_hid) has claimed the device.
+    let rc = unsafe { libc::ioctl(file.as_raw_fd(), I2C_SLAVE_FORCE, addr as libc::c_int) };
     if rc < 0 {
         return Err(std::io::Error::last_os_error());
     }
@@ -283,6 +289,36 @@ fn cell_for(x: i32, y: i32, x_max: i32, y_max: i32, layout: &Layout) -> Option<u
     layout.cells.get(idx).copied().flatten().map(|_| idx)
 }
 
+/// Checks whether *any* connected evdev device currently reports the NumLock
+/// LED as on. Iterating across all devices (not just the first keyboard) is
+/// deliberate: on some laptops only one of several input devices exposes the
+/// LED state, and a wrong `false` here would flip the user's NumLock to OFF.
+fn is_numlock_on() -> bool {
+    for (_, dev) in evdev::enumerate() {
+        if let Ok(leds) = dev.get_led_state()
+            && leds.contains(evdev::LedCode::LED_NUML)
+        {
+            return true;
+        }
+    }
+    false
+}
+
+/// Ensures NumLock is on so that emitted `KEY_KP*` codes are interpreted as
+/// digits, not navigation keys. Without NumLock, KEY_KP1..9 become End/Down/
+/// PgDn/Left/Begin/Right/Home/Up/PgUp (operators are NumLock-independent and
+/// keep working either way).
+///
+/// Called only on Idle→Active transitions; on deactivation we deliberately
+/// leave NumLock on, because we cannot know whether the user originally had
+/// it on themselves and an idempotent "always on after Ayuz" is less
+/// surprising than a state we silently restore.
+fn ensure_numlock_on(virt: &mut VirtualDevice) {
+    if !is_numlock_on() {
+        emit_tap(virt, KeyCode::KEY_NUMLOCK);
+    }
+}
+
 /// Main NumberPad event loop. Spawn via `tokio::spawn`; exit by sending a
 /// new value on `shutdown`. `active_rx` flips Idle/Active without exiting.
 /// `feedback_tx` notifies the component when the active state was toggled
@@ -334,6 +370,7 @@ pub async fn run_loop(
     // Apply initial active state (LEDs + grab) if we entered Active immediately.
     if active {
         apply_active_state(&i2c_path, i2c_addr, stream.device_mut(), true);
+        ensure_numlock_on(&mut virt);
     }
 
     loop {
@@ -346,6 +383,9 @@ pub async fn run_loop(
                 let new_active = *active_rx.borrow();
                 if new_active != active {
                     apply_active_state(&i2c_path, i2c_addr, stream.device_mut(), new_active);
+                    if new_active {
+                        ensure_numlock_on(&mut virt);
+                    }
                     active = new_active;
                     press_cell = None;
                     hold = HoldTimer::Idle;
@@ -428,6 +468,9 @@ pub async fn run_loop(
             } => {
                 let new_active = !active;
                 apply_active_state(&i2c_path, i2c_addr, stream.device_mut(), new_active);
+                if new_active {
+                    ensure_numlock_on(&mut virt);
+                }
                 active = new_active;
                 hold = HoldTimer::Idle;
                 // Suppress the cell emit that would otherwise fire on the
