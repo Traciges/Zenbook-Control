@@ -18,7 +18,9 @@ use evdev::{AbsoluteAxisCode, EventSummary, KeyCode};
 use rust_i18n::t;
 use tokio::sync::watch;
 
+use crate::services::commands::is_kde_desktop;
 use crate::services::evdev_runner::{find_touchpad, open_event_stream, touchpad_abs_bounds};
+use crate::services::kde_brightness;
 
 /// Fraction of touchpad width/height that counts as an edge zone (4%)
 const EDGE_PERCENT: f64 = 0.04;
@@ -198,10 +200,19 @@ pub async fn run_gesture_loop(mut shutdown: watch::Receiver<bool>) {
                             let dy = value - *last_y;
                             if dy.abs() >= STEP_THRESHOLD {
                                 *last_y = value;
-                                if dy < 0 {
-                                    run_action("brightnessctl", &["set", "5%+"]).await;
+                                let delta = if dy < 0 { 5 } else { -5 };
+                                let arg = if delta > 0 { "5%+" } else { "5%-" };
+                                if is_kde_desktop() {
+                                    if let Err(e) =
+                                        kde_brightness::adjust_brightness_relative(delta).await
+                                    {
+                                        tracing::warn!(
+                                            "PowerDevil setBrightness failed, falling back to brightnessctl: {e}"
+                                        );
+                                        run_action("brightnessctl", &["set", arg]).await;
+                                    }
                                 } else {
-                                    run_action("brightnessctl", &["set", "5%-"]).await;
+                                    run_action("brightnessctl", &["set", arg]).await;
                                 }
                             }
                         }

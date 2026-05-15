@@ -24,20 +24,12 @@ use rust_i18n::t;
 use crate::components::display::helpers::DISPLAY_NAME;
 use crate::services::commands::{is_kde_desktop, run_command_blocking};
 use crate::services::config::AppConfig;
-
-#[zbus::proxy(
-    interface = "org.kde.Solid.PowerManagement.Actions.BrightnessControl",
-    default_service = "org.kde.Solid.PowerManagement",
-    default_path = "/org/kde/Solid/PowerManagement/Actions/BrightnessControl"
-)]
-trait BrightnessControl {
-    #[zbus(signal, name = "brightnessChanged")]
-    fn brightness_changed(&self, brightness: i32) -> zbus::Result<()>;
-}
+use crate::services::kde_brightness::BrightnessControlProxy;
 
 pub struct OledDimmingModel {
     brightness: u32,
     kde_available: bool,
+    debounce_task: Option<tokio::task::JoinHandle<()>>,
 }
 
 #[derive(Debug)]
@@ -128,6 +120,7 @@ impl Component for OledDimmingModel {
         let model = OledDimmingModel {
             brightness,
             kde_available: is_kde_desktop(),
+            debounce_task: None,
         };
         let widgets = view_output!();
 
@@ -204,19 +197,20 @@ impl Component for OledDimmingModel {
             }
             OledDimmingCommandOutput::BrightnessChanged => {
                 let value = self.brightness;
-                if value < 100 {
-                    sender.command(move |out, shutdown| {
-                        shutdown
-                            .register(async move {
-                                tokio::time::sleep(std::time::Duration::from_millis(500)).await;
-                                match apply_dimming(value).await {
-                                    Ok(()) => out.emit(OledDimmingCommandOutput::Set(value)),
-                                    Err(e) => out.emit(OledDimmingCommandOutput::Error(e)),
-                                }
-                            })
-                            .drop_on_shutdown()
-                    });
+                if value >= 100 {
+                    return;
                 }
+                if let Some(handle) = self.debounce_task.take() {
+                    handle.abort();
+                }
+                let out = sender.command_sender().clone();
+                self.debounce_task = Some(tokio::spawn(async move {
+                    tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+                    match apply_dimming(value).await {
+                        Ok(()) => out.emit(OledDimmingCommandOutput::Set(value)),
+                        Err(e) => out.emit(OledDimmingCommandOutput::Error(e)),
+                    }
+                }));
             }
         }
     }

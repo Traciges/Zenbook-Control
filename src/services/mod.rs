@@ -21,6 +21,7 @@ pub mod dbus_animatrix;
 pub mod edge_gestures;
 pub(crate) mod evdev_runner;
 pub mod fan_hotkey;
+pub mod kde_brightness;
 pub mod migration;
 pub mod numberpad;
 pub mod numberpad_layouts;
