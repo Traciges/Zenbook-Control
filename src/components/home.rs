@@ -35,6 +35,7 @@ const IMG_VIVOBOOK: &[u8] = include_bytes!("../../assets/img/vivobook.png");
 const IMG_TUF: &[u8] = include_bytes!("../../assets/img/tuf.png");
 const IMG_ROG: &[u8] = include_bytes!("../../assets/img/rog.png");
 const IMG_PROART: &[u8] = include_bytes!("../../assets/img/proart.png");
+const IMG_EXPERTBOOK: &[u8] = include_bytes!("../../assets/img/expertbook.png");
 
 static PROFILE_CSS: OnceLock<()> = OnceLock::new();
 
@@ -873,6 +874,8 @@ impl Component for HomeModel {
                     Some(IMG_ROG)
                 } else if name.contains("proart") {
                     Some(IMG_PROART)
+                } else if name.contains("expertbook") {
+                    Some(IMG_EXPERTBOOK)
                 } else {
                     None
                 };
