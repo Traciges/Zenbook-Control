@@ -20,7 +20,7 @@ use relm4::adw::prelude::*;
 use relm4::prelude::*;
 use rust_i18n::t;
 
-use crate::services::commands::run_command_blocking;
+use crate::services::commands::{run_command_blocking, which_exists};
 use crate::services::config::AppConfig;
 
 pub struct FnKeyModel {
@@ -143,15 +143,7 @@ impl Component for FnKeyModel {
         sender.command(|out, shutdown| {
             shutdown
                 .register(async move {
-                    let ok = tokio::task::spawn_blocking(|| {
-                        std::process::Command::new("which")
-                            .arg("grubby")
-                            .status()
-                            .map(|s| s.success())
-                            .unwrap_or(false)
-                    })
-                    .await
-                    .unwrap_or(false);
+                    let ok = which_exists("grubby").await;
                     out.send(FnKeyCommandOutput::GrubbyChecked(ok)).ok();
                 })
                 .drop_on_shutdown()

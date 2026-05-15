@@ -108,6 +108,31 @@ pub(crate) async fn pkexec_write_sysfs(path: &'static str, value: &'static str) 
     }
 }
 
+/// Returns `true` if `program` resolves on `$PATH` (via `which`).
+///
+/// Runs on `spawn_blocking` so the async runtime is not stalled. A panic or
+/// cancellation of the blocking task is logged via `tracing::warn!` and
+/// reported as `false`; a clean non-zero exit from `which` is reported as
+/// `false` without logging (that's the expected "not installed" path).
+pub(crate) async fn which_exists(program: &'static str) -> bool {
+    let join = tokio::task::spawn_blocking(move || {
+        std::process::Command::new("which")
+            .arg(program)
+            .status()
+            .map(|s| s.success())
+            .unwrap_or(false)
+    })
+    .await;
+
+    match join {
+        Ok(found) => found,
+        Err(e) => {
+            tracing::warn!("which {}: spawn_blocking failed: {}", program, e);
+            false
+        }
+    }
+}
+
 static QDBUS_PATH: std::sync::OnceLock<String> = std::sync::OnceLock::new();
 
 /// Returns the path to the `qdbus` executable, resolved once and cached.

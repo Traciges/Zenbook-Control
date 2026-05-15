@@ -258,11 +258,17 @@ fn read_product_name() -> String {
         .unwrap_or_default()
 }
 
+/// Fractional bounds of the top-right corner activation zone, expressed
+/// relative to the touchpad's absolute X / Y range. Proportional so the
+/// same values work across touchpads with different reported resolutions.
+const TOP_RIGHT_ZONE_X_MIN_FRAC: f64 = 0.85;
+const TOP_RIGHT_ZONE_Y_MAX_FRAC: f64 = 0.15;
+
 /// Top-right corner activation zone. Tuned to match what a user can hit
-/// without precision: the rightmost 15 % horizontally and topmost 15 %
-/// vertically. Proportional - resilient to per-model touchpad dimensions.
+/// without precision: rightmost 15 % horizontally and topmost 15 % vertically.
 fn in_top_right_zone(x: i32, y: i32, x_max: i32, y_max: i32) -> bool {
-    (x as f64) > (x_max as f64) * 0.85 && (y as f64) < (y_max as f64) * 0.15
+    (x as f64) > (x_max as f64) * TOP_RIGHT_ZONE_X_MIN_FRAC
+        && (y as f64) < (y_max as f64) * TOP_RIGHT_ZONE_Y_MAX_FRAC
 }
 
 /// State of the corner-tap hold detector. `Tracking` means the finger is
