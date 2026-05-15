@@ -68,7 +68,9 @@ pub struct AuraDeviceModel {
 
     power_state: LaptopAuraPower,
 
-    // Imperatively-managed widgets.
+    // Widget handles kept on the model so we can update selections, colours
+    // and switch states directly when reloading a profile or refreshing from
+    // the daemon, without rebuilding the declarative view.
     mode_combo: adw::ComboRow,
     zone_row: adw::ComboRow,
     brightness_combo: adw::ComboRow,

@@ -25,9 +25,9 @@ use crate::services::dbus_animatrix::{
     detect_animatrix_hardware,
 };
 
-// Collapses the four `ChangeXxxAnim` update arms. Each lookup-table entry is
-// `(idx, &'static str)`; `field` is the cached `String` on `AnimatrixModel`
-// and `profile_field` is the matching key on the active profile.
+// Applies a built-in animation selection: looks up the dbus identifier in
+// `$table` by index, updates the cached model field and the active profile,
+// then pushes the full animation set to the daemon.
 macro_rules! change_anim {
     ($self:ident, $sender:ident, $idx:expr, $table:expr, $field:ident, $profile_field:ident) => {{
         let val = anim_value(&$table, $idx).to_string();
@@ -35,9 +35,7 @@ macro_rules! change_anim {
             return;
         }
         $self.$field = val;
-        AppConfig::update(|c| {
-            c.active_profile_mut().$profile_field = $self.$field.clone()
-        });
+        AppConfig::update(|c| c.active_profile_mut().$profile_field = $self.$field.clone());
         let anims = $self.build_animations();
         $sender.command(move |out, shutdown| {
             shutdown
@@ -52,8 +50,9 @@ macro_rules! change_anim {
     }};
 }
 
-// Collapses the three `ToggleOffWhenXxx` update arms. `$setter` is the
-// `dbus_animatrix::set_animatrix_off_when_*` async function for that toggle.
+// Applies one of the "turn AniMe off when …" toggles: updates the cached
+// model field and active profile, then forwards the new value to `$setter`
+// (the matching `dbus_animatrix::set_animatrix_off_when_*` function).
 macro_rules! apply_off_toggle {
     ($self:ident, $sender:ident, $v:expr, $field:ident, $profile_field:ident, $setter:path) => {{
         if $v == $self.$field {
@@ -101,59 +100,230 @@ impl GifEntry {
 
 static GIF_CATALOGUE: &[GifEntry] = &[
     // ROG
-    GifEntry { name: "ROG City",             path: "asus/rog/ROG city.gif",              hw_filter: HwFilter::Ga401Only },
-    GifEntry { name: "ROG Glitch",           path: "asus/rog/ROG glitch.gif",            hw_filter: HwFilter::Ga401Only },
-    GifEntry { name: "For Those Who Dare",   path: "asus/rog/For-those-who-dare.gif",    hw_filter: HwFilter::Ga401Only },
-    GifEntry { name: "For Those Who Dare 2", path: "asus/rog/For-those-who-dare_2.gif",  hw_filter: HwFilter::Ga401Only },
-    GifEntry { name: "Fragment",             path: "asus/rog/Fragment.gif",              hw_filter: HwFilter::Ga401Only },
-    GifEntry { name: "Infinite Triangle",    path: "asus/rog/Infinite-triangle.gif",     hw_filter: HwFilter::Ga401Only },
-    GifEntry { name: "Kaleidoscope 1",       path: "asus/rog/Kaleidoscope1.gif",         hw_filter: HwFilter::Ga401Only },
-    GifEntry { name: "Kaleidoscope 2",       path: "asus/rog/Kaleidoscope2.gif",         hw_filter: HwFilter::Ga401Only },
-    GifEntry { name: "Sunset",               path: "asus/rog/Sunset.gif",               hw_filter: HwFilter::Ga401Only },
+    GifEntry {
+        name: "ROG City",
+        path: "asus/rog/ROG city.gif",
+        hw_filter: HwFilter::Ga401Only,
+    },
+    GifEntry {
+        name: "ROG Glitch",
+        path: "asus/rog/ROG glitch.gif",
+        hw_filter: HwFilter::Ga401Only,
+    },
+    GifEntry {
+        name: "For Those Who Dare",
+        path: "asus/rog/For-those-who-dare.gif",
+        hw_filter: HwFilter::Ga401Only,
+    },
+    GifEntry {
+        name: "For Those Who Dare 2",
+        path: "asus/rog/For-those-who-dare_2.gif",
+        hw_filter: HwFilter::Ga401Only,
+    },
+    GifEntry {
+        name: "Fragment",
+        path: "asus/rog/Fragment.gif",
+        hw_filter: HwFilter::Ga401Only,
+    },
+    GifEntry {
+        name: "Infinite Triangle",
+        path: "asus/rog/Infinite-triangle.gif",
+        hw_filter: HwFilter::Ga401Only,
+    },
+    GifEntry {
+        name: "Kaleidoscope 1",
+        path: "asus/rog/Kaleidoscope1.gif",
+        hw_filter: HwFilter::Ga401Only,
+    },
+    GifEntry {
+        name: "Kaleidoscope 2",
+        path: "asus/rog/Kaleidoscope2.gif",
+        hw_filter: HwFilter::Ga401Only,
+    },
+    GifEntry {
+        name: "Sunset",
+        path: "asus/rog/Sunset.gif",
+        hw_filter: HwFilter::Ga401Only,
+    },
     // Gaming
-    GifEntry { name: "Bird",                 path: "asus/gaming/Bird.gif",               hw_filter: HwFilter::Ga401Only },
-    GifEntry { name: "Controller",           path: "asus/gaming/Controller.gif",         hw_filter: HwFilter::Ga401Only },
-    GifEntry { name: "Fight",                path: "asus/gaming/Fight.gif",              hw_filter: HwFilter::Ga401Only },
-    GifEntry { name: "FPS",                  path: "asus/gaming/FPS.gif",               hw_filter: HwFilter::Ga401Only },
-    GifEntry { name: "Keyboard",             path: "asus/gaming/Keyboard.gif",           hw_filter: HwFilter::Ga401Only },
-    GifEntry { name: "MOBA",                 path: "asus/gaming/MOBA.gif",              hw_filter: HwFilter::Ga401Only },
-    GifEntry { name: "UFO",                  path: "asus/gaming/UFO.gif",               hw_filter: HwFilter::Ga401Only },
+    GifEntry {
+        name: "Bird",
+        path: "asus/gaming/Bird.gif",
+        hw_filter: HwFilter::Ga401Only,
+    },
+    GifEntry {
+        name: "Controller",
+        path: "asus/gaming/Controller.gif",
+        hw_filter: HwFilter::Ga401Only,
+    },
+    GifEntry {
+        name: "Fight",
+        path: "asus/gaming/Fight.gif",
+        hw_filter: HwFilter::Ga401Only,
+    },
+    GifEntry {
+        name: "FPS",
+        path: "asus/gaming/FPS.gif",
+        hw_filter: HwFilter::Ga401Only,
+    },
+    GifEntry {
+        name: "Keyboard",
+        path: "asus/gaming/Keyboard.gif",
+        hw_filter: HwFilter::Ga401Only,
+    },
+    GifEntry {
+        name: "MOBA",
+        path: "asus/gaming/MOBA.gif",
+        hw_filter: HwFilter::Ga401Only,
+    },
+    GifEntry {
+        name: "UFO",
+        path: "asus/gaming/UFO.gif",
+        hw_filter: HwFilter::Ga401Only,
+    },
     // Festive
-    GifEntry { name: "Cupid",                path: "asus/festive/Cupid.gif",             hw_filter: HwFilter::Ga401Only },
-    GifEntry { name: "Firework",             path: "asus/festive/Firework.gif",          hw_filter: HwFilter::Ga401Only },
-    GifEntry { name: "Halloween",            path: "asus/festive/Halloween.gif",         hw_filter: HwFilter::Ga401Only },
-    GifEntry { name: "Happy Holiday",        path: "asus/festive/Happy Holiday.gif",     hw_filter: HwFilter::Ga401Only },
-    GifEntry { name: "Happy New Year",       path: "asus/festive/Happy new year.gif",    hw_filter: HwFilter::Ga401Only },
-    GifEntry { name: "Lantern",              path: "asus/festive/Lantern.gif",           hw_filter: HwFilter::Ga401Only },
-    GifEntry { name: "Love U Mom",           path: "asus/festive/Love u mom.gif",        hw_filter: HwFilter::Ga401Only },
-    GifEntry { name: "Mother's Day",         path: "asus/festive/Mother's day.gif",      hw_filter: HwFilter::Ga401Only },
-    GifEntry { name: "Valentine's Day",      path: "asus/festive/Valentine's Day.gif",   hw_filter: HwFilter::Ga401Only },
-    GifEntry { name: "Year of the Ox",       path: "asus/festive/Year of the Ox.gif",    hw_filter: HwFilter::Ga401Only },
+    GifEntry {
+        name: "Cupid",
+        path: "asus/festive/Cupid.gif",
+        hw_filter: HwFilter::Ga401Only,
+    },
+    GifEntry {
+        name: "Firework",
+        path: "asus/festive/Firework.gif",
+        hw_filter: HwFilter::Ga401Only,
+    },
+    GifEntry {
+        name: "Halloween",
+        path: "asus/festive/Halloween.gif",
+        hw_filter: HwFilter::Ga401Only,
+    },
+    GifEntry {
+        name: "Happy Holiday",
+        path: "asus/festive/Happy Holiday.gif",
+        hw_filter: HwFilter::Ga401Only,
+    },
+    GifEntry {
+        name: "Happy New Year",
+        path: "asus/festive/Happy new year.gif",
+        hw_filter: HwFilter::Ga401Only,
+    },
+    GifEntry {
+        name: "Lantern",
+        path: "asus/festive/Lantern.gif",
+        hw_filter: HwFilter::Ga401Only,
+    },
+    GifEntry {
+        name: "Love U Mom",
+        path: "asus/festive/Love u mom.gif",
+        hw_filter: HwFilter::Ga401Only,
+    },
+    GifEntry {
+        name: "Mother's Day",
+        path: "asus/festive/Mother's day.gif",
+        hw_filter: HwFilter::Ga401Only,
+    },
+    GifEntry {
+        name: "Valentine's Day",
+        path: "asus/festive/Valentine's Day.gif",
+        hw_filter: HwFilter::Ga401Only,
+    },
+    GifEntry {
+        name: "Year of the Ox",
+        path: "asus/festive/Year of the Ox.gif",
+        hw_filter: HwFilter::Ga401Only,
+    },
     // Music
-    GifEntry { name: "Diamond",              path: "asus/music/Diamond.gif",             hw_filter: HwFilter::Ga401Only },
-    GifEntry { name: "DJ",                   path: "asus/music/DJ.gif",                 hw_filter: HwFilter::Ga401Only },
-    GifEntry { name: "Music Player",         path: "asus/music/Music-player.gif",        hw_filter: HwFilter::Ga401Only },
+    GifEntry {
+        name: "Diamond",
+        path: "asus/music/Diamond.gif",
+        hw_filter: HwFilter::Ga401Only,
+    },
+    GifEntry {
+        name: "DJ",
+        path: "asus/music/DJ.gif",
+        hw_filter: HwFilter::Ga401Only,
+    },
+    GifEntry {
+        name: "Music Player",
+        path: "asus/music/Music-player.gif",
+        hw_filter: HwFilter::Ga401Only,
+    },
     // Trend
-    GifEntry { name: "Dog",                  path: "asus/trend/Dog.gif",                hw_filter: HwFilter::Ga401Only },
-    GifEntry { name: "Hero",                 path: "asus/trend/Hero.gif",               hw_filter: HwFilter::Ga401Only },
-    GifEntry { name: "Ski",                  path: "asus/trend/Ski.gif",                hw_filter: HwFilter::Ga401Only },
-    GifEntry { name: "The Scream",           path: "asus/trend/The scream.gif",          hw_filter: HwFilter::Ga401Only },
-    GifEntry { name: "Wave",                 path: "asus/trend/Wave.gif",               hw_filter: HwFilter::Ga401Only },
+    GifEntry {
+        name: "Dog",
+        path: "asus/trend/Dog.gif",
+        hw_filter: HwFilter::Ga401Only,
+    },
+    GifEntry {
+        name: "Hero",
+        path: "asus/trend/Hero.gif",
+        hw_filter: HwFilter::Ga401Only,
+    },
+    GifEntry {
+        name: "Ski",
+        path: "asus/trend/Ski.gif",
+        hw_filter: HwFilter::Ga401Only,
+    },
+    GifEntry {
+        name: "The Scream",
+        path: "asus/trend/The scream.gif",
+        hw_filter: HwFilter::Ga401Only,
+    },
+    GifEntry {
+        name: "Wave",
+        path: "asus/trend/Wave.gif",
+        hw_filter: HwFilter::Ga401Only,
+    },
     // GU604 (reserved for future library support)
-    GifEntry { name: "Fighting Games 2022",  path: "gu604/Fighting Games 2022_GU604.gif",            hw_filter: HwFilter::Gu604Only },
-    GifEntry { name: "Halloween II",         path: "gu604/Halloween II_GU604.gif",                   hw_filter: HwFilter::Gu604Only },
-    GifEntry { name: "Infinite Triangle",    path: "gu604/Infinite triangle_GU604.gif",              hw_filter: HwFilter::Gu604Only },
-    GifEntry { name: "Lunar New Year",       path: "gu604/Lunar new year dragon dance_GU604.gif",    hw_filter: HwFilter::Gu604Only },
-    GifEntry { name: "OMNI",                 path: "gu604/OMNI_GU604.gif",                           hw_filter: HwFilter::Gu604Only },
-    GifEntry { name: "Pinball",              path: "gu604/PInball_GU604.gif",                        hw_filter: HwFilter::Gu604Only },
-    GifEntry { name: "ROG Glitch",           path: "gu604/ROG glitch_GU604.gif",                     hw_filter: HwFilter::Gu604Only },
-    GifEntry { name: "Wizard",               path: "gu604/Wizard_GU604.gif",                         hw_filter: HwFilter::Gu604Only },
+    GifEntry {
+        name: "Fighting Games 2022",
+        path: "gu604/Fighting Games 2022_GU604.gif",
+        hw_filter: HwFilter::Gu604Only,
+    },
+    GifEntry {
+        name: "Halloween II",
+        path: "gu604/Halloween II_GU604.gif",
+        hw_filter: HwFilter::Gu604Only,
+    },
+    GifEntry {
+        name: "Infinite Triangle",
+        path: "gu604/Infinite triangle_GU604.gif",
+        hw_filter: HwFilter::Gu604Only,
+    },
+    GifEntry {
+        name: "Lunar New Year",
+        path: "gu604/Lunar new year dragon dance_GU604.gif",
+        hw_filter: HwFilter::Gu604Only,
+    },
+    GifEntry {
+        name: "OMNI",
+        path: "gu604/OMNI_GU604.gif",
+        hw_filter: HwFilter::Gu604Only,
+    },
+    GifEntry {
+        name: "Pinball",
+        path: "gu604/PInball_GU604.gif",
+        hw_filter: HwFilter::Gu604Only,
+    },
+    GifEntry {
+        name: "ROG Glitch",
+        path: "gu604/ROG glitch_GU604.gif",
+        hw_filter: HwFilter::Gu604Only,
+    },
+    GifEntry {
+        name: "Wizard",
+        path: "gu604/Wizard_GU604.gif",
+        hw_filter: HwFilter::Gu604Only,
+    },
 ];
 
 // ── Animation string ↔ index helpers ─────────────────────────────────────────
 
 const BOOT_ANIMS: [(&str, &str); 2] = [
-    ("GlitchConstruction", "animatrix_boot_anim_glitch_construction"),
+    (
+        "GlitchConstruction",
+        "animatrix_boot_anim_glitch_construction",
+    ),
     ("StaticEmergence", "animatrix_boot_anim_static_emergence"),
 ];
 const AWAKE_ANIMS: [(&str, &str); 2] = [
@@ -170,14 +340,14 @@ const SHUTDOWN_ANIMS: [(&str, &str); 2] = [
 ];
 
 fn anim_index(table: &[(&str, &str)], name: &str) -> u32 {
-    table
-        .iter()
-        .position(|(v, _)| *v == name)
-        .unwrap_or(0) as u32
+    table.iter().position(|(v, _)| *v == name).unwrap_or(0) as u32
 }
 
 fn anim_value(table: &[(&'static str, &'static str)], idx: u32) -> &'static str {
-    table.get(idx as usize).map(|(v, _)| *v).unwrap_or(table[0].0)
+    table
+        .get(idx as usize)
+        .map(|(v, _)| *v)
+        .unwrap_or(table[0].0)
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -201,7 +371,8 @@ pub struct AnimatrixModel {
     play_btn_label: String,
     playing_title: String,
     playback_cancel: Option<tokio::sync::oneshot::Sender<()>>,
-    // Imperative widget refs for profile loading
+    // Widget handles kept on the model so `LoadProfile` can update the
+    // selected entries without going through the declarative view.
     brightness_combo: adw::ComboRow,
     boot_combo: adw::ComboRow,
     awake_combo: adw::ComboRow,
@@ -478,7 +649,10 @@ impl Component for AnimatrixModel {
         let br_med = t!("aura_brightness_med").to_string();
         let br_high = t!("aura_brightness_high").to_string();
         let brightness_refs: Vec<&str> = vec![
-            br_off.as_str(), br_low.as_str(), br_med.as_str(), br_high.as_str(),
+            br_off.as_str(),
+            br_low.as_str(),
+            br_med.as_str(),
+            br_high.as_str(),
         ];
         let brightness_combo = adw::ComboRow::new();
         brightness_combo.set_model(Some(&gtk::StringList::new(&brightness_refs)));
@@ -489,26 +663,22 @@ impl Component for AnimatrixModel {
         });
 
         // Animation combos
-        let boot_combo =
-            build_anim_combo(&BOOT_ANIMS, &p.animatrix_boot_anim, {
-                let sender = sender.clone();
-                move |idx| sender.input(AnimatrixMsg::ChangeBootAnim(idx))
-            });
-        let awake_combo =
-            build_anim_combo(&AWAKE_ANIMS, &p.animatrix_awake_anim, {
-                let sender = sender.clone();
-                move |idx| sender.input(AnimatrixMsg::ChangeAwakeAnim(idx))
-            });
-        let sleep_combo =
-            build_anim_combo(&SLEEP_ANIMS, &p.animatrix_sleep_anim, {
-                let sender = sender.clone();
-                move |idx| sender.input(AnimatrixMsg::ChangeSleepAnim(idx))
-            });
-        let shutdown_combo =
-            build_anim_combo(&SHUTDOWN_ANIMS, &p.animatrix_shutdown_anim, {
-                let sender = sender.clone();
-                move |idx| sender.input(AnimatrixMsg::ChangeShutdownAnim(idx))
-            });
+        let boot_combo = build_anim_combo(&BOOT_ANIMS, &p.animatrix_boot_anim, {
+            let sender = sender.clone();
+            move |idx| sender.input(AnimatrixMsg::ChangeBootAnim(idx))
+        });
+        let awake_combo = build_anim_combo(&AWAKE_ANIMS, &p.animatrix_awake_anim, {
+            let sender = sender.clone();
+            move |idx| sender.input(AnimatrixMsg::ChangeAwakeAnim(idx))
+        });
+        let sleep_combo = build_anim_combo(&SLEEP_ANIMS, &p.animatrix_sleep_anim, {
+            let sender = sender.clone();
+            move |idx| sender.input(AnimatrixMsg::ChangeSleepAnim(idx))
+        });
+        let shutdown_combo = build_anim_combo(&SHUTDOWN_ANIMS, &p.animatrix_shutdown_anim, {
+            let sender = sender.clone();
+            move |idx| sender.input(AnimatrixMsg::ChangeShutdownAnim(idx))
+        });
 
         // GIF combo
         let gif_combo = adw::ComboRow::new();
@@ -590,12 +760,7 @@ impl Component for AnimatrixModel {
         ComponentParts { model, widgets }
     }
 
-    fn update(
-        &mut self,
-        msg: AnimatrixMsg,
-        sender: ComponentSender<Self>,
-        _root: &Self::Root,
-    ) {
+    fn update(&mut self, msg: AnimatrixMsg, sender: ComponentSender<Self>, _root: &Self::Root) {
         match msg {
             AnimatrixMsg::ToggleEnable(v) => {
                 if v == self.current_enable_display {
@@ -652,26 +817,75 @@ impl Component for AnimatrixModel {
             }
 
             AnimatrixMsg::ChangeBootAnim(idx) => {
-                change_anim!(self, sender, idx, BOOT_ANIMS, current_boot_anim, animatrix_boot_anim);
+                change_anim!(
+                    self,
+                    sender,
+                    idx,
+                    BOOT_ANIMS,
+                    current_boot_anim,
+                    animatrix_boot_anim
+                );
             }
             AnimatrixMsg::ChangeAwakeAnim(idx) => {
-                change_anim!(self, sender, idx, AWAKE_ANIMS, current_awake_anim, animatrix_awake_anim);
+                change_anim!(
+                    self,
+                    sender,
+                    idx,
+                    AWAKE_ANIMS,
+                    current_awake_anim,
+                    animatrix_awake_anim
+                );
             }
             AnimatrixMsg::ChangeSleepAnim(idx) => {
-                change_anim!(self, sender, idx, SLEEP_ANIMS, current_sleep_anim, animatrix_sleep_anim);
+                change_anim!(
+                    self,
+                    sender,
+                    idx,
+                    SLEEP_ANIMS,
+                    current_sleep_anim,
+                    animatrix_sleep_anim
+                );
             }
             AnimatrixMsg::ChangeShutdownAnim(idx) => {
-                change_anim!(self, sender, idx, SHUTDOWN_ANIMS, current_shutdown_anim, animatrix_shutdown_anim);
+                change_anim!(
+                    self,
+                    sender,
+                    idx,
+                    SHUTDOWN_ANIMS,
+                    current_shutdown_anim,
+                    animatrix_shutdown_anim
+                );
             }
 
             AnimatrixMsg::ToggleOffWhenUnplugged(v) => {
-                apply_off_toggle!(self, sender, v, current_off_unplugged, animatrix_off_when_unplugged, dbus_animatrix::set_animatrix_off_when_unplugged);
+                apply_off_toggle!(
+                    self,
+                    sender,
+                    v,
+                    current_off_unplugged,
+                    animatrix_off_when_unplugged,
+                    dbus_animatrix::set_animatrix_off_when_unplugged
+                );
             }
             AnimatrixMsg::ToggleOffWhenSuspended(v) => {
-                apply_off_toggle!(self, sender, v, current_off_suspended, animatrix_off_when_suspended, dbus_animatrix::set_animatrix_off_when_suspended);
+                apply_off_toggle!(
+                    self,
+                    sender,
+                    v,
+                    current_off_suspended,
+                    animatrix_off_when_suspended,
+                    dbus_animatrix::set_animatrix_off_when_suspended
+                );
             }
             AnimatrixMsg::ToggleOffWhenLidClosed(v) => {
-                apply_off_toggle!(self, sender, v, current_off_lid_closed, animatrix_off_when_lid_closed, dbus_animatrix::set_animatrix_off_when_lid_closed);
+                apply_off_toggle!(
+                    self,
+                    sender,
+                    v,
+                    current_off_lid_closed,
+                    animatrix_off_when_lid_closed,
+                    dbus_animatrix::set_animatrix_off_when_lid_closed
+                );
             }
 
             AnimatrixMsg::SelectGif(idx) => {
@@ -686,8 +900,7 @@ impl Component for AnimatrixModel {
                     self.is_playing = false;
                     self.update_playback_labels();
                 } else {
-                    let Some(entry) = self.available_gifs.get(self.current_gif_idx as usize)
-                    else {
+                    let Some(entry) = self.available_gifs.get(self.current_gif_idx as usize) else {
                         return;
                     };
                     let gif_path = crate::sys_paths::anime_assets_dir().join(entry.path);
@@ -776,7 +989,9 @@ impl Component for AnimatrixModel {
                 }
                 self.is_playing = false;
 
-                // Update model fields before syncing widgets (re-entrancy guard)
+                // Update cached state before touching widgets so the
+                // `connect_selected_notify` callbacks see the new values and
+                // short-circuit instead of re-sending the change to the daemon.
                 self.current_enable_display = enable_display;
                 self.current_brightness = brightness.min(3);
                 self.current_builtins_enabled = builtins_enabled;
@@ -789,10 +1004,14 @@ impl Component for AnimatrixModel {
                 self.current_off_lid_closed = off_lid_closed;
 
                 self.brightness_combo.set_selected(self.current_brightness);
-                self.boot_combo.set_selected(anim_index(&BOOT_ANIMS, &boot_anim));
-                self.awake_combo.set_selected(anim_index(&AWAKE_ANIMS, &awake_anim));
-                self.sleep_combo.set_selected(anim_index(&SLEEP_ANIMS, &sleep_anim));
-                self.shutdown_combo.set_selected(anim_index(&SHUTDOWN_ANIMS, &shutdown_anim));
+                self.boot_combo
+                    .set_selected(anim_index(&BOOT_ANIMS, &boot_anim));
+                self.awake_combo
+                    .set_selected(anim_index(&AWAKE_ANIMS, &awake_anim));
+                self.sleep_combo
+                    .set_selected(anim_index(&SLEEP_ANIMS, &sleep_anim));
+                self.shutdown_combo
+                    .set_selected(anim_index(&SHUTDOWN_ANIMS, &shutdown_anim));
 
                 let anims = self.build_animations();
                 sender.command(move |out, shutdown| {
@@ -835,7 +1054,8 @@ impl Component for AnimatrixModel {
                 off_suspended,
                 off_lid_closed,
             } => {
-                // Update model first, then widgets
+                // Cache the daemon's values on the model, then mirror them
+                // into the combo rows for the initial UI state.
                 self.current_enable_display = enable_display;
                 self.current_brightness = brightness;
                 self.current_builtins_enabled = builtins_enabled;
@@ -848,10 +1068,14 @@ impl Component for AnimatrixModel {
                 self.current_off_lid_closed = off_lid_closed;
 
                 self.brightness_combo.set_selected(brightness);
-                self.boot_combo.set_selected(anim_index(&BOOT_ANIMS, &animations.boot));
-                self.awake_combo.set_selected(anim_index(&AWAKE_ANIMS, &animations.awake));
-                self.sleep_combo.set_selected(anim_index(&SLEEP_ANIMS, &animations.sleep));
-                self.shutdown_combo.set_selected(anim_index(&SHUTDOWN_ANIMS, &animations.shutdown));
+                self.boot_combo
+                    .set_selected(anim_index(&BOOT_ANIMS, &animations.boot));
+                self.awake_combo
+                    .set_selected(anim_index(&AWAKE_ANIMS, &animations.awake));
+                self.sleep_combo
+                    .set_selected(anim_index(&SLEEP_ANIMS, &animations.sleep));
+                self.shutdown_combo
+                    .set_selected(anim_index(&SHUTDOWN_ANIMS, &animations.shutdown));
             }
 
             AnimatrixCommandOutput::PlaybackStopped => {

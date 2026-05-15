@@ -756,8 +756,9 @@ impl SimpleComponent for AppModel {
 
 // ── PreferencesGroup builders ────────────────────────────────────────────────
 //
-// Self-contained subsections of `init()` extracted so the function focuses on
-// wiring. Each builder owns its row construction and signal hookups.
+// Each builder constructs one `adw::PreferencesGroup` together with the rows
+// inside it and wires up the relevant signals. They are called from `init()`
+// so that the top-level component code stays focused on page composition.
 
 /// Hint group hosted on the keyboard page. Surfaces the ASUS hardware-key
 /// shortcut help row plus two app-level toggles (fan-profile hotkey + OSD).
