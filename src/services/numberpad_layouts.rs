@@ -29,10 +29,13 @@
 
 use evdev::KeyCode;
 
-/// A single cell in the proportional grid.
+/// A single cell in the proportional grid. `keys` is a press-and-release
+/// sequence — single-key cells use a one-element slice, while macro cells
+/// (e.g. `Shift + 5` for `%`) chain multiple codes that the emitter fires
+/// in order forward and releases in reverse.
 #[derive(Copy, Clone)]
 pub struct Cell {
-    pub key: KeyCode,
+    pub keys: &'static [KeyCode],
 }
 
 /// A row-major proportional layout. `cells.len()` must equal `rows * cols`.
@@ -46,7 +49,15 @@ pub struct Layout {
 macro_rules! k {
     ($code:ident) => {
         Some(Cell {
-            key: KeyCode::$code,
+            keys: &[KeyCode::$code],
+        })
+    };
+}
+
+macro_rules! m {
+    ($($code:ident),+) => {
+        Some(Cell {
+            keys: &[$(KeyCode::$code),+],
         })
     };
 }
@@ -65,11 +76,27 @@ pub const UNIVERSAL_4X4: Layout = Layout {
     ],
 };
 
+/// ASUS Zenbook 14 (UX3405MA) 5x4 NumberPad. Five columns: the rightmost
+/// adds `/`, `*`, `-`, `+` as a dedicated operator column and a tall
+/// `Backspace` zone (stacked over rows 0+1). The `%` cell is emitted as a
+/// `Shift + 5` macro because Linux has no `KEY_KPPERCENT` evdev code; this
+/// produces `%` under any keyboard layout that follows the standard top-row
+/// digit mapping (US, DE, LT, ...).
+pub const UX3405MA_5X4: Layout = Layout {
+    rows: 4,
+    cols: 5,
+    #[rustfmt::skip]
+    cells: &[
+        k!(KEY_KP7), k!(KEY_KP8),   k!(KEY_KP9),     k!(KEY_KPSLASH),    k!(KEY_BACKSPACE),
+        k!(KEY_KP4), k!(KEY_KP5),   k!(KEY_KP6),     k!(KEY_KPASTERISK), k!(KEY_BACKSPACE),
+        k!(KEY_KP1), k!(KEY_KP2),   k!(KEY_KP3),     k!(KEY_KPMINUS),    m!(KEY_LEFTSHIFT, KEY_5),
+        k!(KEY_KP0), k!(KEY_KPDOT), k!(KEY_KPENTER), k!(KEY_KPPLUS),     k!(KEY_KPEQUAL),
+    ],
+};
+
 /// Override table: substring of `/sys/class/dmi/id/product_name` -> layout.
-/// First match wins. Empty for v1 - the universal layout works for the
-/// devices we have tested. Add entries here as users report model-specific
-/// quirks.
-const LAYOUTS: &[(&str, &Layout)] = &[];
+/// First match wins. Add entries here as users report model-specific quirks.
+const LAYOUTS: &[(&str, &Layout)] = &[("UX3405MA", &UX3405MA_5X4)];
 
 /// Returns the layout for the given DMI product name, falling back to
 /// [`UNIVERSAL_4X4`] when no override matches.

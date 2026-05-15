@@ -241,6 +241,9 @@ fn build_virtual_device() -> std::io::Result<VirtualDevice> {
         KeyCode::KEY_KPSLASH,
         KeyCode::KEY_BACKSPACE,
         KeyCode::KEY_NUMLOCK,
+        KeyCode::KEY_KPEQUAL,
+        KeyCode::KEY_LEFTSHIFT,
+        KeyCode::KEY_5,
     ]);
     VirtualDevice::builder()?
         .name("Ayuz NumberPad")
@@ -315,7 +318,7 @@ fn is_numlock_on() -> bool {
 /// surprising than a state we silently restore.
 fn ensure_numlock_on(virt: &mut VirtualDevice) {
     if !is_numlock_on() {
-        emit_tap(virt, KeyCode::KEY_NUMLOCK);
+        emit_tap(virt, &[KeyCode::KEY_NUMLOCK]);
     }
 }
 
@@ -425,7 +428,7 @@ pub async fn run_loop(
                                 && p == r
                                 && let Some(cell) = layout.cells[p]
                             {
-                                emit_tap(&mut virt, cell.key);
+                                emit_tap(&mut virt, cell.keys);
                             }
                         }
                         press_cell = None;
@@ -511,16 +514,22 @@ fn apply_active_state(i2c_path: &Path, i2c_addr: u16, device: &mut Device, activ
     }
 }
 
-/// Emits a press + release for `key` through the virtual device. `emit` auto-
-/// appends a `SYN_REPORT` per call, so each is a complete event.
-fn emit_tap(virt: &mut VirtualDevice, key: KeyCode) {
-    let press = InputEvent::new(evdev::EventType::KEY.0, key.0, 1);
-    let release = InputEvent::new(evdev::EventType::KEY.0, key.0, 0);
-    if let Err(e) = virt.emit(&[press]) {
-        tracing::warn!("NumberPad: emit press failed: {}", e);
-        return;
+/// Emits a press-then-release sequence for `keys` through the virtual device.
+/// Presses fire in order, releases fire in reverse — so for `[Shift, 5]` the
+/// timeline is Shift-down, 5-down, 5-up, Shift-up, which is the textbook
+/// modifier ordering. `emit` auto-appends a `SYN_REPORT` per call.
+fn emit_tap(virt: &mut VirtualDevice, keys: &[KeyCode]) {
+    for key in keys {
+        let press = InputEvent::new(evdev::EventType::KEY.0, key.0, 1);
+        if let Err(e) = virt.emit(&[press]) {
+            tracing::warn!("NumberPad: emit press failed: {}", e);
+            return;
+        }
     }
-    if let Err(e) = virt.emit(&[release]) {
-        tracing::warn!("NumberPad: emit release failed: {}", e);
+    for key in keys.iter().rev() {
+        let release = InputEvent::new(evdev::EventType::KEY.0, key.0, 0);
+        if let Err(e) = virt.emit(&[release]) {
+            tracing::warn!("NumberPad: emit release failed: {}", e);
+        }
     }
 }
