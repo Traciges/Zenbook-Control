@@ -96,7 +96,10 @@ pub const UX3405MA_5X4: Layout = Layout {
 
 /// Override table: substring of `/sys/class/dmi/id/product_name` -> layout.
 /// First match wins. Add entries here as users report model-specific quirks.
-const LAYOUTS: &[(&str, &Layout)] = &[("UX3405MA", &UX3405MA_5X4)];
+const LAYOUTS: &[(&str, &Layout)] = &[
+    ("UX3405MA", &UX3405MA_5X4),
+    ("UM3402", &UX3405MA_5X4),
+];
 
 /// Returns the layout for the given DMI product name, falling back to
 /// [`UNIVERSAL_4X4`] when no override matches.
