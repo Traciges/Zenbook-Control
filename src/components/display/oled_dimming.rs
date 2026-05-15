@@ -205,7 +205,7 @@ impl Component for OledDimmingModel {
                 }
                 let out = sender.command_sender().clone();
                 self.debounce_task = Some(tokio::spawn(async move {
-                    tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+                    tokio::time::sleep(std::time::Duration::from_millis(800)).await;
                     match apply_dimming(value).await {
                         Ok(()) => out.emit(OledDimmingCommandOutput::Set(value)),
                         Err(e) => out.emit(OledDimmingCommandOutput::Error(e)),
