@@ -37,7 +37,6 @@ pub struct NumberpadModel {
     shutdown_tx: Option<watch::Sender<bool>>,
     /// Sends new Active/Idle state to the running loop. Some(_) iff alive.
     active_tx: Option<watch::Sender<bool>>,
-    status_label: gtk::Label,
 }
 
 #[derive(Debug)]
@@ -67,10 +66,11 @@ impl Component for NumberpadModel {
             set_title: &t!("numberpad_group_title"),
             set_description: Some(&t!("numberpad_group_desc")),
 
-            #[name = "status_label"]
             add = &gtk::Label {
                 #[watch]
                 set_visible: !matches!(model.status, NumberpadStatus::Ok),
+                #[watch]
+                set_label: &status_message(&model.status),
                 add_css_class: "error",
                 set_wrap: true,
                 set_xalign: 0.0,
@@ -103,7 +103,6 @@ impl Component for NumberpadModel {
         sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
         let enabled = AppConfig::load().active_profile().numberpad_active;
-        let status_label = gtk::Label::new(None);
         let model = NumberpadModel {
             enabled,
             active: false,
@@ -111,7 +110,6 @@ impl Component for NumberpadModel {
             status: NumberpadStatus::NoHardware,
             shutdown_tx: None,
             active_tx: None,
-            status_label: status_label.clone(),
         };
         let widgets = view_output!();
 
@@ -129,7 +127,6 @@ impl Component for NumberpadModel {
     fn update(&mut self, msg: NumberpadMsg, sender: ComponentSender<Self>, _root: &Self::Root) {
         match msg {
             NumberpadMsg::Probed(status) => {
-                self.status_label.set_label(&status_message(&status));
                 self.status = status;
                 // If hardware probe failed but the persisted profile had this
                 // enabled, leave self.enabled untouched - the switch is just
