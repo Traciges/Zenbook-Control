@@ -139,10 +139,15 @@ The NumberPad driver runs entirely in-process. It needs unprivileged read/write 
    sudo usermod -aG i2c,input $USER
    ```
 
-3. Install the bundled udev rules. Distro packages (Fedora/Debian/RPM/DEB) install them automatically to `/usr/lib/udev/rules.d/99-ayuz-numberpad.rules`. For source builds:
+3. Install the bundled udev rules. Distro packages (Fedora/Debian/RPM/DEB) install them automatically to `/usr/lib/udev/rules.d/99-ayuz-numberpad.rules`. 
+**For source builds and AppImage users**, manual installation is required:
 
    ```bash
-   sudo cp packaging/udev/99-ayuz-numberpad.rules /etc/udev/rules.d/
+   # If using the AppImage, download the rules file first:
+   wget [https://raw.githubusercontent.com/Traciges/Ayuz/main/packaging/udev/99-ayuz-numberpad.rules](https://raw.githubusercontent.com/Traciges/Ayuz/main/packaging/udev/99-ayuz-numberpad.rules)
+
+   # Copy it to the system folder and reload udev:
+   sudo cp 99-ayuz-numberpad.rules /etc/udev/rules.d/
    sudo udevadm control --reload-rules && sudo udevadm trigger
    ```
 
@@ -366,6 +371,8 @@ Download the package matching your distribution from the [GitHub Releases](https
   chmod +x ayuz-1.1.4-1.AppImage
   ./ayuz-1.1.4-1.AppImage
   ```
+
+**Note for AppImage users:** Because the AppImage runs without root privileges, it cannot install the necessary hardware permissions for the ASUS NumberPad automatically. If you want to use the NumberPad feature, please follow the manual `udev` rules installation in the NumberPad Requirements section above.
 
 ### Uninstall
 
