@@ -152,6 +152,7 @@ fn_key_mode_locked: "locked"
 fn_key_mode_normal: "normal"
 fn_key_saved: "Fn key set to %{mode} – takes effect after restart."
 fn_key_save_error: "Error while saving: %{error}"
+fn_key_grubby_missing_warning: "The 'grubby' tool is not installed. Automatic modification of kernel parameters is currently only supported on Fedora/RHEL distributions."
 
 # asus_key_hint
 asus_key_hint_group_title: "Launch via ASUS Key"

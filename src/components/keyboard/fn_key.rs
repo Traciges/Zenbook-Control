@@ -25,6 +25,7 @@ use crate::services::config::AppConfig;
 
 pub struct FnKeyModel {
     locked: bool,
+    grubby_available: bool,
     check_locked: gtk::CheckButton,
     check_normal: gtk::CheckButton,
     row_hint: adw::ActionRow,
@@ -40,6 +41,7 @@ pub enum FnKeyMsg {
 
 #[derive(Debug)]
 pub enum FnKeyCommandOutput {
+    GrubbyChecked(bool),
     Set(bool),
     Error(String),
 }
@@ -55,6 +57,19 @@ impl Component for FnKeyModel {
         adw::PreferencesGroup {
             set_title: &t!("fn_key_group_title"),
             set_description: Some(&t!("fn_key_group_desc")),
+
+            add = &gtk::Label {
+                #[watch]
+                set_visible: !model.grubby_available,
+                set_label: &t!("fn_key_grubby_missing_warning"),
+                add_css_class: "error",
+                set_wrap: true,
+                set_xalign: 0.0,
+                set_margin_top: 8,
+                set_margin_start: 12,
+                set_margin_end: 12,
+                set_margin_bottom: 4,
+            },
 
             add = &model.row_hint.clone(),
             add = &model.row_locked.clone(),
@@ -115,6 +130,7 @@ impl Component for FnKeyModel {
 
         let model = FnKeyModel {
             locked,
+            grubby_available: false,
             check_locked,
             check_normal,
             row_hint,
@@ -123,6 +139,23 @@ impl Component for FnKeyModel {
         };
 
         let widgets = view_output!();
+
+        sender.command(|out, shutdown| {
+            shutdown
+                .register(async move {
+                    let ok = tokio::task::spawn_blocking(|| {
+                        std::process::Command::new("which")
+                            .arg("grubby")
+                            .status()
+                            .map(|s| s.success())
+                            .unwrap_or(false)
+                    })
+                    .await
+                    .unwrap_or(false);
+                    out.send(FnKeyCommandOutput::GrubbyChecked(ok)).ok();
+                })
+                .drop_on_shutdown()
+        });
 
         ComponentParts { model, widgets }
     }
@@ -202,6 +235,11 @@ impl Component for FnKeyModel {
         _root: &Self::Root,
     ) {
         match msg {
+            FnKeyCommandOutput::GrubbyChecked(ok) => {
+                self.grubby_available = ok;
+                self.row_locked.set_sensitive(ok);
+                self.row_normal.set_sensitive(ok);
+            }
             FnKeyCommandOutput::Set(locked) => {
                 AppConfig::update(|c| c.active_profile_mut().input_fn_key_locked = locked);
                 let mode = if locked {

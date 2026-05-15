@@ -152,6 +152,7 @@ fn_key_mode_locked: "gesperrt"
 fn_key_mode_normal: "normal"
 fn_key_saved: "Fn-Taste %{mode} gespeichert – wirksam nach Systemneustart."
 fn_key_save_error: "Fehler beim Speichern: %{error}"
+fn_key_grubby_missing_warning: "Das Tool 'grubby' ist nicht installiert. Die automatische Änderung von Kernel-Parametern wird derzeit nur auf Fedora/RHEL-Distributionen unterstützt."
 
 # asus_key_hint
 asus_key_hint_group_title: "Starten über ASUS-Taste"
