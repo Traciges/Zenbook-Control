@@ -133,7 +133,7 @@ The NumberPad driver runs entirely in-process. It needs unprivileged read/write 
    sudo modprobe i2c-dev uinput
    ```
 
-2. Add your user to the `i2c` and `input` groups, then log out and back in:
+2. Add your user to the `i2c` and `input` groups, then restart your device:
 
    ```bash
    sudo usermod -aG i2c,input $USER
