@@ -56,6 +56,7 @@ Instead, the relevant controls are scattered across a variety of independent too
 - Aura RGB lighting via raw D-Bus calls to `asusd`
 - AniMatrix support
 - OLED-specific care settings buried in KDE power management config files
+- NumberPad support for illuminated numeric keypad integrated to touchpad
 
 Ayuz aims to consolidate all of these into a single, clean GTK4 interface - making it easy to manage your ASUS laptop on Linux without needing to know which tool controls which feature. <br>
 The application is smart about availability: if a required tool or desktop environment is not detected, the corresponding setting is automatically disabled rather than silently failing.
