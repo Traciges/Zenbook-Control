@@ -54,9 +54,9 @@ Instead, the relevant controls are scattered across a variety of independent too
 - Fan profiles via D-Bus calls to `asusd`
 - Keyboard backlight via idle daemons like `swayidle`
 - Aura RGB lighting via raw D-Bus calls to `asusd`
-- AniMatrix support
+- AniMatrix support via `asusctl`
 - OLED-specific care settings buried in KDE power management config files
-- NumberPad support for illuminated numeric keypad integrated to touchpad
+- NumberPad support for illuminated numeric keypad via `asus-numberpad-driver`
 
 Ayuz aims to consolidate all of these into a single, clean GTK4 interface - making it easy to manage your ASUS laptop on Linux without needing to know which tool controls which feature. <br>
 The application is smart about availability: if a required tool or desktop environment is not detected, the corresponding setting is automatically disabled rather than silently failing.
@@ -119,7 +119,7 @@ Controls for the AniMatrix LED matrix display found on select ROG laptops (e.g. 
 | --------------- | ------------------------------------------------------------------------- | ---------------------------- |
 | Smart Gestures  | Control volume, brightness, and media playback via touchpad edge swipes   | `brightnessctl`, `playerctl` |
 | Touchpad Toggle | Enable or disable the touchpad, with a 10-second auto-revert safety timer | KDE or GNOME                 |
-| ASUS NumberPad  | Toggle the LED numeric keypad embedded in the touchpad. Emits standard Linux Numpad keycodes (`KEY_KP0`..`KEY_KPENTER`) through a virtual uinput device, so international keyboard layouts (e.g. German, Lithuanian) work natively. Flip the active state at runtime with `ayuz --toggle-numberpad`. | `i2c-dev` + `uinput` kernel modules; user in `i2c` and `input` groups (see below) |
+| ASUS NumberPad  | Toggle the LED numeric keypad embedded in the touchpad. Emits standard Linux Numpad keycodes (`KEY_KP0`..`KEY_KPENTER`) through a virtual uinput device, so international keyboard layouts (e.g. German, Lithuanian) work natively. | `i2c-dev` + `uinput` kernel modules; user in `i2c` and `input` groups (see below) |
 
 #### NumberPad Requirements
 
@@ -140,7 +140,7 @@ The NumberPad driver runs entirely in-process. It needs unprivileged read/write 
    sudo usermod -aG i2c,input $USER
    ```
 
-3. Install the bundled udev rules. Distro packages (Fedora/Debian/RPM/DEB) install them automatically to `/usr/lib/udev/rules.d/99-ayuz-numberpad.rules`. 
+3. Install the bundled udev rules. Distro packages (Fedora/Debian/RPM/DEB) install them automatically to `/usr/lib/udev/rules.d/99-ayuz-numberpad.rules` so you don't need to do anything if you run one of these.
 **For source builds and AppImage users**, manual installation is required:
 
    ```bash
